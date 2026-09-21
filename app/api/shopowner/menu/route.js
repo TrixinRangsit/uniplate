@@ -1,7 +1,6 @@
 import db from "@/lib/db";
 import { getSession } from "@/lib/auth";
-import fs from "fs/promises";
-import path from "path";
+import cloudinary from "@/lib/cloudinary";
 
 export async function GET() {
   try {
@@ -101,10 +100,6 @@ export async function POST(request) {
     }
 
     /*
-      IMPORTANT
-
-      The food court is NOT taken from the frontend.
-
       The logged-in shop owner determines
       which food court the menu belongs to.
     */
@@ -147,7 +142,8 @@ export async function POST(request) {
     }
 
     /*
-      Verify the food court actually exists
+      Verify the food court exists
+      and is active.
     */
 
     const [foodCourts] = await db.query(
@@ -206,17 +202,23 @@ export async function POST(request) {
       );
     }
 
-    let imagePath = null;
-
     /*
-      Save menu image
+      ==========================================
+      UPLOAD MENU IMAGE TO CLOUDINARY
+      ==========================================
     */
+
+    let imagePath = null;
 
     if (
       image &&
       typeof image === "object" &&
       image.size > 0
     ) {
+      /*
+        Maximum image size: 5 MB
+      */
+
       if (image.size > 5 * 1024 * 1024) {
         return Response.json(
           {
@@ -226,6 +228,10 @@ export async function POST(request) {
           { status: 400 }
         );
       }
+
+      /*
+        Allowed image types
+      */
 
       const allowedTypes = [
         "image/jpeg",
@@ -245,50 +251,82 @@ export async function POST(request) {
         );
       }
 
-      const uploadDir = path.join(
-        process.cwd(),
-        "public",
-        "uploads"
-      );
+      try {
+        /*
+          Convert the uploaded File into a Buffer.
+        */
 
-      await fs.mkdir(uploadDir, {
-        recursive: true,
-      });
+        const buffer = Buffer.from(
+          await image.arrayBuffer()
+        );
 
-      const extension =
-        image.name?.split(".").pop()?.toLowerCase() || "jpg";
+        /*
+          Upload the image to Cloudinary.
+        */
 
-      const safeExtension = [
-        "jpg",
-        "jpeg",
-        "png",
-        "webp",
-      ].includes(extension)
-        ? extension
-        : "jpg";
+        const uploadResult = await new Promise(
+          (resolve, reject) => {
+            const uploadStream =
+              cloudinary.uploader.upload_stream(
+                {
+                  folder: "uniplate/menu",
+                  resource_type: "image",
+                  use_filename: true,
+                  unique_filename: true,
+                  overwrite: false,
+                },
+                (error, result) => {
+                  if (error) {
+                    reject(error);
+                  } else {
+                    resolve(result);
+                  }
+                }
+              );
 
-      const fileName =
-        `menu-${session.user_id}-${Date.now()}.${safeExtension}`;
+            uploadStream.end(buffer);
+          }
+        );
 
-      const filePath = path.join(
-        uploadDir,
-        fileName
-      );
+        /*
+          Cloudinary returns the permanent
+          HTTPS image URL.
 
-      const buffer = Buffer.from(
-        await image.arrayBuffer()
-      );
+          This URL will work from:
+          - Localhost
+          - Vercel
+          - Phone
+          - Laptop
+          - Other computers
+        */
 
-      await fs.writeFile(
-        filePath,
-        buffer
-      );
+        imagePath = uploadResult.secure_url;
 
-      imagePath = `/uploads/${fileName}`;
+        console.log(
+          "CLOUDINARY MENU IMAGE UPLOADED:",
+          imagePath
+        );
+      } catch (uploadError) {
+        console.error(
+          "CLOUDINARY MENU IMAGE UPLOAD ERROR:",
+          uploadError
+        );
+
+        return Response.json(
+          {
+            success: false,
+            message:
+              "Failed to upload menu image to cloud storage.",
+          },
+          { status: 500 }
+        );
+      }
     }
 
     /*
-      CREATE MENU
+      ==========================================
+      CREATE MENU ITEM
+      ==========================================
 
       food_court_id comes from the logged-in
       shop owner's assigned food court.
@@ -332,7 +370,8 @@ export async function POST(request) {
        item=${result.insertId}
        owner=${session.user_id}
        foodCourt=${owner.food_court_id}
-       foodCourtName=${foodCourt.name}`
+       foodCourtName=${foodCourt.name}
+       image=${imagePath || "none"}`
     );
 
     return Response.json(

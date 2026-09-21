@@ -1,7 +1,6 @@
 import db from "@/lib/db";
 import { getSession } from "@/lib/auth";
-import fs from "fs/promises";
-import path from "path";
+import cloudinary from "@/lib/cloudinary";
 
 export async function POST(request) {
   let connection;
@@ -280,41 +279,45 @@ export async function POST(request) {
 
     /*
      * --------------------------------------------------
-     * Save payment slip
+     * Upload payment slip to Cloudinary
      * --------------------------------------------------
      */
-
-    const extension =
-      slip.type === "image/png"
-        ? "png"
-        : slip.type === "image/webp"
-        ? "webp"
-        : "jpg";
-
-    const uploadDir = path.join(
-      process.cwd(),
-      "public",
-      "uploads"
-    );
-
-    await fs.mkdir(uploadDir, {
-      recursive: true,
-    });
-
-    const fileName = `payment-${session.user_id}-${Date.now()}.${extension}`;
-
-    const filePath = path.join(
-      uploadDir,
-      fileName
-    );
 
     const buffer = Buffer.from(
       await slip.arrayBuffer()
     );
 
-    await fs.writeFile(filePath, buffer);
+    const uploadResult = await new Promise(
+      (resolve, reject) => {
+        const uploadStream =
+          cloudinary.uploader.upload_stream(
+            {
+              folder: "uniplate/payment-slips",
+              resource_type: "image",
+              use_filename: true,
+              unique_filename: true,
+              overwrite: false,
+            },
+            (error, result) => {
+              if (error) {
+                reject(error);
+              } else {
+                resolve(result);
+              }
+            }
+          );
 
-    const paymentProof = `/uploads/${fileName}`;
+        uploadStream.end(buffer);
+      }
+    );
+
+    if (!uploadResult?.secure_url) {
+      throw new Error(
+        "Payment slip upload to Cloudinary failed"
+      );
+    }
+
+    const paymentProof = uploadResult.secure_url;
 
     /*
      * --------------------------------------------------
