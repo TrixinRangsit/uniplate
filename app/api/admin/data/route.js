@@ -15,19 +15,35 @@ export async function GET() {
       ORDER BY user_id DESC
     `);
 
-    // Get pending shop owners and delivery accounts
+    // Get Shop Owners and Delivery accounts
     const [approvals] = await db.query(`
       SELECT
-        user_id,
+        u.user_id,
+        u.name,
+        u.email,
+        u.phone,
+        u.role,
+        u.approval_status,
+        u.reject_reason,
+        u.food_court_id,
+        fc.name AS food_court_name
+      FROM users u
+      LEFT JOIN food_courts fc
+        ON u.food_court_id = fc.food_court_id
+      WHERE u.role IN ('shopowner', 'delivery')
+      ORDER BY u.user_id DESC
+    `);
+
+    // Get all active food courts
+    const [foodCourts] = await db.query(`
+      SELECT
+        food_court_id,
         name,
-        email,
-        phone,
-        role,
-        approval_status,
-        reject_reason
-      FROM users
-      WHERE role IN ('shopowner', 'delivery')
-      ORDER BY user_id DESC
+        location,
+        status
+      FROM food_courts
+      WHERE status = 'active'
+      ORDER BY food_court_id ASC
     `);
 
     // Get all orders
@@ -70,9 +86,9 @@ export async function GET() {
       success: true,
       students,
       approvals,
+      foodCourts,
       orders,
     });
-
   } catch (error) {
     console.error("Admin data error:", error);
 

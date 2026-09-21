@@ -8,6 +8,7 @@ export default function AdminPage() {
 
   const [students, setStudents] = useState([]);
   const [approvals, setApprovals] = useState([]);
+  const [foodCourts, setFoodCourts] = useState([]);
   const [orders, setOrders] = useState([]);
   const [payments, setPayments] = useState([]);
 
@@ -34,9 +35,12 @@ export default function AdminPage() {
       if (data.success) {
         setStudents(data.students || []);
         setApprovals(data.approvals || []);
+        setFoodCourts(data.foodCourts || []);
         setOrders(data.orders || []);
       } else {
-        setMessage(data.message || "Failed to load admin data.");
+        setMessage(
+          data.message || "Failed to load admin data."
+        );
       }
     } catch (error) {
       console.error("ADMIN DATA ERROR:", error);
@@ -61,12 +65,15 @@ export default function AdminPage() {
         setPayments(data.payments || []);
       } else {
         setMessage(
-          data.message || "Failed to load payment submissions."
+          data.message ||
+            "Failed to load payment submissions."
         );
       }
     } catch (error) {
       console.error("PAYMENT LOAD ERROR:", error);
-      setMessage("Failed to load payment submissions.");
+      setMessage(
+        "Failed to load payment submissions."
+      );
     } finally {
       setPaymentLoading(false);
     }
@@ -85,29 +92,41 @@ export default function AdminPage() {
   // APPROVE / REJECT ACCOUNT
   // ==========================================
 
-  async function handleApproval(userId, action) {
+  async function handleApproval(
+    userId,
+    action,
+    foodCourtId = null
+  ) {
     try {
-      const response = await fetch("/api/admin/approve", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          user_id: userId,
-          action,
-        }),
-      });
+      const response = await fetch(
+        "/api/admin/approve",
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            user_id: userId,
+            action,
+            food_court_id: foodCourtId,
+          }),
+        }
+      );
 
       const data = await response.json();
 
       if (data.success) {
         setMessage(data.message);
-        loadAdminData();
+        await loadAdminData();
       } else {
         setMessage(data.message);
       }
     } catch (error) {
-      console.error("ACCOUNT APPROVAL ERROR:", error);
+      console.error(
+        "ACCOUNT APPROVAL ERROR:",
+        error
+      );
+
       setMessage("Something went wrong.");
     }
   }
@@ -116,26 +135,32 @@ export default function AdminPage() {
   // APPROVE PAYMENT
   // ==========================================
 
-  async function handlePaymentApprove(checkoutId) {
+  async function handlePaymentApprove(
+    checkoutId
+  ) {
     try {
       setPaymentLoading(true);
       setMessage("");
 
-      const response = await fetch("/api/admin/payments/approve", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          checkout_id: checkoutId,
-        }),
-      });
+      const response = await fetch(
+        "/api/admin/payments/approve",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            checkout_id: checkoutId,
+          }),
+        }
+      );
 
       const data = await response.json();
 
       if (!response.ok || !data.success) {
         setMessage(
-          data.message || "Unable to approve payment."
+          data.message ||
+            "Unable to approve payment."
         );
         return;
       }
@@ -149,8 +174,14 @@ export default function AdminPage() {
       await loadPayments();
       await loadAdminData();
     } catch (error) {
-      console.error("APPROVE PAYMENT ERROR:", error);
-      setMessage("Unable to approve payment.");
+      console.error(
+        "APPROVE PAYMENT ERROR:",
+        error
+      );
+
+      setMessage(
+        "Unable to approve payment."
+      );
     } finally {
       setPaymentLoading(false);
     }
@@ -175,7 +206,9 @@ export default function AdminPage() {
     }
 
     if (!rejectReason.trim()) {
-      setMessage("Please enter a rejection reason.");
+      setMessage(
+        "Please enter a rejection reason."
+      );
       return;
     }
 
@@ -201,7 +234,8 @@ export default function AdminPage() {
 
       if (!response.ok || !data.success) {
         setMessage(
-          data.message || "Unable to reject payment."
+          data.message ||
+            "Unable to reject payment."
         );
         return;
       }
@@ -209,13 +243,21 @@ export default function AdminPage() {
       setRejectingCheckout(null);
       setRejectReason("");
 
-      setMessage("Payment rejected successfully.");
+      setMessage(
+        "Payment rejected successfully."
+      );
 
       await loadPayments();
       await loadAdminData();
     } catch (error) {
-      console.error("REJECT PAYMENT ERROR:", error);
-      setMessage("Unable to reject payment.");
+      console.error(
+        "REJECT PAYMENT ERROR:",
+        error
+      );
+
+      setMessage(
+        "Unable to reject payment."
+      );
     } finally {
       setPaymentLoading(false);
     }
@@ -231,7 +273,10 @@ export default function AdminPage() {
         method: "POST",
       });
     } catch (error) {
-      console.error("LOGOUT ERROR:", error);
+      console.error(
+        "LOGOUT ERROR:",
+        error
+      );
     }
 
     router.push("/login");
@@ -340,10 +385,7 @@ export default function AdminPage() {
       ===================================== */}
 
       <header className="bg-[#211e1a] text-white px-5 py-3">
-
         <div className="max-w-7xl mx-auto flex items-center justify-between">
-
-          {/* LEFT */}
 
           <div className="flex items-center gap-4">
 
@@ -362,7 +404,6 @@ export default function AdminPage() {
             <div className="h-5 w-px bg-white/20" />
 
             <div>
-
               <h1 className="text-lg font-bold">
                 UniPlate Admin
               </h1>
@@ -370,12 +411,9 @@ export default function AdminPage() {
               <p className="text-gray-400 text-xs">
                 Administration Dashboard
               </p>
-
             </div>
 
           </div>
-
-          {/* RIGHT */}
 
           <div className="flex items-center gap-2">
 
@@ -394,7 +432,6 @@ export default function AdminPage() {
           </div>
 
         </div>
-
       </header>
 
       {/* =====================================
@@ -432,7 +469,6 @@ export default function AdminPage() {
         <section className="mb-7">
 
           <div className="mb-3">
-
             <h2 className="text-xl font-bold">
               Account Approval
             </h2>
@@ -440,7 +476,6 @@ export default function AdminPage() {
             <p className="text-gray-500 text-sm mt-0.5">
               Approve or reject Shop Owner and Delivery accounts.
             </p>
-
           </div>
 
           <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
@@ -479,6 +514,10 @@ export default function AdminPage() {
 
                       <th className="text-left px-4 py-3">
                         Role
+                      </th>
+
+                      <th className="text-left px-4 py-3">
+                        Food Court
                       </th>
 
                       <th className="text-left px-4 py-3">
@@ -522,6 +561,38 @@ export default function AdminPage() {
                           {user.role}
                         </td>
 
+                        {/* FOOD COURT */}
+
+                        <td className="px-4 py-3">
+
+                          {user.role === "shopowner" ? (
+
+                            user.food_court_name ? (
+
+                              <span className="text-sm text-gray-700">
+                                {user.food_court_name}
+                              </span>
+
+                            ) : (
+
+                              <span className="text-xs text-red-500">
+                                Not assigned
+                              </span>
+
+                            )
+
+                          ) : (
+
+                            <span className="text-gray-400 text-sm">
+                              —
+                            </span>
+
+                          )}
+
+                        </td>
+
+                        {/* STATUS */}
+
                         <td className="px-4 py-3">
 
                           <span
@@ -534,35 +605,110 @@ export default function AdminPage() {
 
                         </td>
 
+                        {/* ACTION */}
+
                         <td className="px-4 py-3">
 
                           {user.approval_status === "pending" ? (
 
-                            <div className="flex gap-1.5">
+                            <div className="flex flex-col gap-2">
 
-                              <button
-                                onClick={() =>
-                                  handleApproval(
-                                    user.user_id,
-                                    "approve"
-                                  )
-                                }
-                                className="bg-green-600 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-green-700"
-                              >
-                                Approve
-                              </button>
+                              {/* FOOD COURT SELECTOR */}
 
-                              <button
-                                onClick={() =>
-                                  handleApproval(
-                                    user.user_id,
-                                    "reject"
-                                  )
-                                }
-                                className="bg-red-600 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-red-700"
-                              >
-                                Reject
-                              </button>
+                              {user.role === "shopowner" && (
+
+                                <select
+                                  id={`food-court-${user.user_id}`}
+                                  defaultValue=""
+                                  className="border border-gray-300 rounded-md px-2.5 py-1.5 text-xs bg-white outline-none focus:border-[#211e1a]"
+                                >
+
+                                  <option
+                                    value=""
+                                    disabled
+                                  >
+                                    Select Food Court
+                                  </option>
+
+                                  {foodCourts.map(
+                                    (foodCourt) => (
+                                      <option
+                                        key={
+                                          foodCourt.food_court_id
+                                        }
+                                        value={
+                                          foodCourt.food_court_id
+                                        }
+                                      >
+                                        {foodCourt.name}
+                                      </option>
+                                    )
+                                  )}
+
+                                </select>
+
+                              )}
+
+                              <div className="flex gap-1.5">
+
+                                {/* APPROVE */}
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+
+                                    let foodCourtId =
+                                      null;
+
+                                    if (
+                                      user.role ===
+                                      "shopowner"
+                                    ) {
+
+                                      const select =
+                                        document.getElementById(
+                                          `food-court-${user.user_id}`
+                                        );
+
+                                      foodCourtId =
+                                        select?.value;
+
+                                      if (!foodCourtId) {
+                                        setMessage(
+                                          "Please select a Food Court before approving this Shop Owner."
+                                        );
+
+                                        return;
+                                      }
+                                    }
+
+                                    handleApproval(
+                                      user.user_id,
+                                      "approve",
+                                      foodCourtId
+                                    );
+                                  }}
+                                  className="bg-green-600 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-green-700"
+                                >
+                                  Approve
+                                </button>
+
+                                {/* REJECT */}
+
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleApproval(
+                                      user.user_id,
+                                      "reject"
+                                    )
+                                  }
+                                  className="bg-red-600 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-red-700"
+                                >
+                                  Reject
+                                </button>
+
+                              </div>
 
                             </div>
 
@@ -627,7 +773,8 @@ export default function AdminPage() {
 
           <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
 
-            {paymentLoading && payments.length === 0 ? (
+            {paymentLoading &&
+            payments.length === 0 ? (
 
               <div className="p-8 text-center text-gray-500 text-sm">
                 Loading payment submissions...
@@ -685,9 +832,10 @@ export default function AdminPage() {
 
                     {payments.map((payment) => {
 
-                      const slipUrl = getSlipUrl(
-                        payment.payment_proof
-                      );
+                      const slipUrl =
+                        getSlipUrl(
+                          payment.payment_proof
+                        );
 
                       return (
                         <tr
@@ -706,11 +854,13 @@ export default function AdminPage() {
                           <td className="px-4 py-4">
 
                             <div className="font-medium">
-                              {payment.student_name || "-"}
+                              {payment.student_name ||
+                                "-"}
                             </div>
 
                             <div className="text-xs text-gray-500 mt-1">
-                              {payment.student_email || "-"}
+                              {payment.student_email ||
+                                "-"}
                             </div>
 
                           </td>
@@ -729,7 +879,8 @@ export default function AdminPage() {
                           {/* METHOD */}
 
                           <td className="px-4 py-4">
-                            {payment.payment_method || "QR"}
+                            {payment.payment_method ||
+                              "QR"}
                           </td>
 
                           {/* SLIP */}
@@ -806,7 +957,9 @@ export default function AdminPage() {
                                       payment
                                     )
                                   }
-                                  disabled={paymentLoading}
+                                  disabled={
+                                    paymentLoading
+                                  }
                                   className="bg-green-600 text-white px-4 py-2 rounded-md text-xs font-semibold hover:bg-green-700 disabled:opacity-50"
                                 >
                                   Approve
@@ -819,7 +972,9 @@ export default function AdminPage() {
                                       payment.checkout_id
                                     )
                                   }
-                                  disabled={paymentLoading}
+                                  disabled={
+                                    paymentLoading
+                                  }
                                   className="bg-red-600 text-white px-4 py-2 rounded-md text-xs font-semibold hover:bg-red-700 disabled:opacity-50"
                                 >
                                   Reject
@@ -1083,7 +1238,9 @@ export default function AdminPage() {
 
                         <td className="px-4 py-3 font-semibold">
                           ฿
-                          {Number(order.total).toFixed(2)}
+                          {Number(
+                            order.total
+                          ).toFixed(2)}
                         </td>
 
                         <td className="px-4 py-3">
@@ -1121,6 +1278,7 @@ export default function AdminPage() {
       ===================================== */}
 
       {approvingPayment && (
+
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-5 backdrop-blur-sm"
           onClick={() => {
@@ -1132,10 +1290,12 @@ export default function AdminPage() {
 
           <div
             className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl"
-            onClick={(event) => event.stopPropagation()}
+            onClick={(event) =>
+              event.stopPropagation()
+            }
           >
 
-            {/* MODAL HEADER */}
+            {/* HEADER */}
 
             <div className="border-b border-gray-100 px-6 py-5">
 
@@ -1172,7 +1332,7 @@ export default function AdminPage() {
 
             </div>
 
-            {/* MODAL CONTENT */}
+            {/* CONTENT */}
 
             <div className="px-6 py-5">
 
@@ -1201,7 +1361,8 @@ export default function AdminPage() {
                   </span>
 
                   <span className="font-medium text-gray-900">
-                    {approvingPayment.student_name || "-"}
+                    {approvingPayment.student_name ||
+                      "-"}
                   </span>
 
                 </div>
@@ -1236,13 +1397,15 @@ export default function AdminPage() {
 
             </div>
 
-            {/* MODAL ACTIONS */}
+            {/* ACTIONS */}
 
             <div className="flex gap-3 border-t border-gray-100 px-6 py-4">
 
               <button
                 type="button"
-                onClick={() => setApprovingPayment(null)}
+                onClick={() =>
+                  setApprovingPayment(null)
+                }
                 disabled={paymentLoading}
                 className="flex-1 rounded-xl border border-gray-300 px-4 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
               >
@@ -1276,19 +1439,26 @@ export default function AdminPage() {
       ===================================== */}
 
       {selectedSlip && (
+
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-5 backdrop-blur-sm"
-          onClick={() => setSelectedSlip(null)}
+          onClick={() =>
+            setSelectedSlip(null)
+          }
         >
 
           <div
             className="relative max-h-[90vh] max-w-3xl rounded-2xl bg-white p-4 shadow-2xl"
-            onClick={(event) => event.stopPropagation()}
+            onClick={(event) =>
+              event.stopPropagation()
+            }
           >
 
             <button
               type="button"
-              onClick={() => setSelectedSlip(null)}
+              onClick={() =>
+                setSelectedSlip(null)
+              }
               className="absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-black/70 text-xl text-white hover:bg-black"
             >
               ×
@@ -1302,6 +1472,7 @@ export default function AdminPage() {
 
               <p className="text-xs text-gray-500">
                 Checkout #{selectedSlip.checkout}
+
                 {selectedSlip.student
                   ? ` • ${selectedSlip.student}`
                   : ""}
@@ -1329,19 +1500,24 @@ export default function AdminPage() {
       ===================================== */}
 
       {rejectingCheckout && (
+
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-5 backdrop-blur-sm"
           onClick={() => {
+
             if (!paymentLoading) {
               setRejectingCheckout(null);
               setRejectReason("");
             }
+
           }}
         >
 
           <div
             className="w-full max-w-md rounded-2xl bg-white shadow-2xl"
-            onClick={(event) => event.stopPropagation()}
+            onClick={(event) =>
+              event.stopPropagation()
+            }
           >
 
             {/* HEADER */}
@@ -1393,7 +1569,9 @@ export default function AdminPage() {
               <textarea
                 value={rejectReason}
                 onChange={(event) =>
-                  setRejectReason(event.target.value)
+                  setRejectReason(
+                    event.target.value
+                  )
                 }
                 placeholder="Example: Payment amount does not match the order total."
                 className="h-32 w-full resize-none rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-red-500 focus:ring-2 focus:ring-red-100"
