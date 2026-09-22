@@ -3,13 +3,27 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
+/*
+  UniPlate — Shop Owner Dashboard
+  Redesigned for:
+  - Premium modern dashboard UI
+  - Responsive desktop/tablet/mobile layout
+  - Menu management
+  - Order management
+  - Dashboard overview
+  - Account management
+  - Live order refresh
+  - Search + filters
+  - Clean minimalist icon system
+*/
+
 export default function ShopOwnerPage() {
   const router = useRouter();
   const profileRef = useRef(null);
 
-  // =====================================================
+  // =========================================================
   // ACCOUNT
-  // =====================================================
+  // =========================================================
 
   const [account, setAccount] = useState(null);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -22,18 +36,22 @@ export default function ShopOwnerPage() {
     image: null,
   });
 
-  // =====================================================
+  const [accountPreview, setAccountPreview] = useState("");
+
+  // =========================================================
   // MENU
-  // =====================================================
+  // =========================================================
 
   const [menuItems, setMenuItems] = useState([]);
   const [loadingMenu, setLoadingMenu] = useState(true);
   const [menuMessage, setMenuMessage] = useState("");
-  const [search, setSearch] = useState("");
+  const [menuSearch, setMenuSearch] = useState("");
+  const [menuCategory, setMenuCategory] = useState("All");
 
   const [showMenuModal, setShowMenuModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [savingMenu, setSavingMenu] = useState(false);
+  const [menuImagePreview, setMenuImagePreview] = useState("");
 
   const [menuForm, setMenuForm] = useState({
     name: "",
@@ -43,25 +61,28 @@ export default function ShopOwnerPage() {
     image: null,
   });
 
-  // =====================================================
+  // =========================================================
   // ORDERS
-  // =====================================================
+  // =========================================================
 
   const [orders, setOrders] = useState([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [orderMessage, setOrderMessage] = useState("");
   const [updatingOrderId, setUpdatingOrderId] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [orderFilter, setOrderFilter] = useState("all");
+  const [orderSearch, setOrderSearch] = useState("");
 
-  // =====================================================
+  // =========================================================
   // PAGE
-  // =====================================================
+  // =========================================================
 
-  const [activePage, setActivePage] = useState("menu");
+  const [activePage, setActivePage] = useState("overview");
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
-  // =====================================================
+  // =========================================================
   // PROFILE OUTSIDE CLICK
-  // =====================================================
+  // =========================================================
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -80,9 +101,44 @@ export default function ShopOwnerPage() {
     };
   }, []);
 
-  // =====================================================
+  // =========================================================
+  // ESCAPE MODALS
+  // =========================================================
+
+  useEffect(() => {
+    function handleEscape(event) {
+      if (event.key !== "Escape") return;
+
+      setProfileOpen(false);
+      setMobileSidebarOpen(false);
+
+      if (selectedOrder) {
+        setSelectedOrder(null);
+      }
+
+      if (showMenuModal) {
+        setShowMenuModal(false);
+      }
+
+      if (showAccountModal) {
+        setShowAccountModal(false);
+      }
+    }
+
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [
+    selectedOrder,
+    showMenuModal,
+    showAccountModal,
+  ]);
+
+  // =========================================================
   // LOAD ACCOUNT
-  // =====================================================
+  // =========================================================
 
   async function loadAccount() {
     try {
@@ -109,9 +165,9 @@ export default function ShopOwnerPage() {
     }
   }
 
-  // =====================================================
+  // =========================================================
   // LOAD MENU
-  // =====================================================
+  // =========================================================
 
   async function loadMenu() {
     try {
@@ -125,7 +181,9 @@ export default function ShopOwnerPage() {
       const data = await response.json();
 
       if (!response.ok || !data.success) {
-        setMenuMessage(data.message || "Unable to load menu.");
+        setMenuMessage(
+          data.message || "Unable to load menu."
+        );
         return;
       }
 
@@ -138,9 +196,9 @@ export default function ShopOwnerPage() {
     }
   }
 
-  // =====================================================
+  // =========================================================
   // LOAD ORDERS
-  // =====================================================
+  // =========================================================
 
   async function loadOrders(showLoading = true) {
     try {
@@ -172,9 +230,9 @@ export default function ShopOwnerPage() {
     }
   }
 
-  // =====================================================
+  // =========================================================
   // INITIAL LOAD
-  // =====================================================
+  // =========================================================
 
   useEffect(() => {
     loadAccount();
@@ -182,15 +240,11 @@ export default function ShopOwnerPage() {
     loadOrders();
   }, []);
 
-  // =====================================================
-  // ORDER AUTO REFRESH
-  // =====================================================
+  // =========================================================
+  // LIVE ORDER REFRESH
+  // =========================================================
 
   useEffect(() => {
-    if (activePage !== "orders") {
-      return;
-    }
-
     loadOrders(false);
 
     const interval = setInterval(() => {
@@ -198,51 +252,129 @@ export default function ShopOwnerPage() {
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [activePage]);
+  }, []);
 
-  // =====================================================
-  // SEARCH
-  // =====================================================
+  // =========================================================
+  // MENU DATA
+  // =========================================================
 
-  const filteredItems = useMemo(() => {
-    const keyword = search.trim().toLowerCase();
+  const categories = useMemo(() => {
+    const unique = [
+      ...new Set(
+        menuItems
+          .map((item) => item.category)
+          .filter(Boolean)
+      ),
+    ];
 
-    if (!keyword) {
-      return menuItems;
-    }
+    return ["All", ...unique];
+  }, [menuItems]);
 
-    return menuItems.filter((item) =>
-      [
-        item.name,
-        item.description,
-        item.category,
-      ]
-        .filter(Boolean)
-        .some((value) =>
-          String(value)
-            .toLowerCase()
-            .includes(keyword)
-        )
-    );
-  }, [menuItems, search]);
+  const filteredMenuItems = useMemo(() => {
+    const keyword = menuSearch.trim().toLowerCase();
 
-  const riceItems = filteredItems.filter(
-    (item) => item.category === "Rice"
-  );
+    return menuItems.filter((item) => {
+      const matchesCategory =
+        menuCategory === "All" ||
+        item.category === menuCategory;
 
-  const noodleItems = filteredItems.filter(
-    (item) => item.category === "Noodles"
-  );
+      const matchesSearch =
+        !keyword ||
+        [
+          item.name,
+          item.description,
+          item.category,
+        ]
+          .filter(Boolean)
+          .some((value) =>
+            String(value)
+              .toLowerCase()
+              .includes(keyword)
+          );
 
-  const otherItems = filteredItems.filter(
-    (item) =>
-      item.category !== "Rice" &&
-      item.category !== "Noodles"
-  );
+      return matchesCategory && matchesSearch;
+    });
+  }, [
+    menuItems,
+    menuCategory,
+    menuSearch,
+  ]);
 
-  // =====================================================
-  // MENU STATISTICS
-  // =====================================================
+  // =========================================================
+  // ORDER DATA
+  // =========================================================
+
+  const orderCounts = useMemo(() => {
+    return {
+      all: orders.length,
+
+      pending: orders.filter(
+        (order) =>
+          order.order_status === "pending"
+      ).length,
+
+      confirmed: orders.filter(
+        (order) =>
+          order.order_status === "confirmed"
+      ).length,
+
+      preparing: orders.filter(
+        (order) =>
+          order.order_status === "preparing"
+      ).length,
+
+      ready: orders.filter(
+        (order) =>
+          order.order_status === "ready"
+      ).length,
+
+      cancelled: orders.filter(
+        (order) =>
+          order.order_status === "cancelled"
+      ).length,
+    };
+  }, [orders]);
+
+  const filteredOrders = useMemo(() => {
+    const keyword = orderSearch.trim().toLowerCase();
+
+    return orders.filter((order) => {
+      const matchesFilter =
+        orderFilter === "all" ||
+        order.order_status === orderFilter;
+
+      const matchesSearch =
+        !keyword ||
+        [
+          order.order_id,
+          order.student_name,
+          order.student_phone,
+          order.delivery_phone,
+          order.shop_name,
+          order.building_number,
+        ]
+          .filter(
+            (value) =>
+              value !== undefined &&
+              value !== null
+          )
+          .some((value) =>
+            String(value)
+              .toLowerCase()
+              .includes(keyword)
+          );
+
+      return matchesFilter && matchesSearch;
+    });
+  }, [
+    orders,
+    orderFilter,
+    orderSearch,
+  ]);
+
+  // =========================================================
+  // STATISTICS
+  // =========================================================
 
   const totalMenuItems = menuItems.length;
 
@@ -258,13 +390,26 @@ export default function ShopOwnerPage() {
       .filter(Boolean)
   ).size;
 
-  // =====================================================
+  const todayRevenue = orders
+    .filter(
+      (order) =>
+        order.order_status !== "cancelled"
+    )
+    .reduce(
+      (sum, order) =>
+        sum + Number(order.total_amount || 0),
+      0
+    );
+
+  const needsAttention =
+    orderCounts.pending +
+    orderCounts.confirmed;
+
+  // =========================================================
   // MENU FUNCTIONS
-  // =====================================================
+  // =========================================================
 
-  function openAddMenu() {
-    setEditingItem(null);
-
+  function resetMenuForm() {
     setMenuForm({
       name: "",
       description: "",
@@ -273,6 +418,12 @@ export default function ShopOwnerPage() {
       image: null,
     });
 
+    setMenuImagePreview("");
+  }
+
+  function openAddMenu() {
+    setEditingItem(null);
+    resetMenuForm();
     setShowMenuModal(true);
   }
 
@@ -287,7 +438,21 @@ export default function ShopOwnerPage() {
       image: null,
     });
 
+    setMenuImagePreview(item.image || "");
     setShowMenuModal(true);
+  }
+
+  function handleMenuImageChange(event) {
+    const file = event.target.files?.[0] || null;
+
+    setMenuForm((previous) => ({
+      ...previous,
+      image: file,
+    }));
+
+    if (file) {
+      setMenuImagePreview(URL.createObjectURL(file));
+    }
   }
 
   async function saveMenu(event) {
@@ -308,16 +473,31 @@ export default function ShopOwnerPage() {
     try {
       const formData = new FormData();
 
-      formData.append("name", menuForm.name);
+      formData.append(
+        "name",
+        menuForm.name.trim()
+      );
+
       formData.append(
         "description",
         menuForm.description || ""
       );
-      formData.append("price", menuForm.price);
-      formData.append("category", menuForm.category);
+
+      formData.append(
+        "price",
+        menuForm.price
+      );
+
+      formData.append(
+        "category",
+        menuForm.category
+      );
 
       if (menuForm.image) {
-        formData.append("image", menuForm.image);
+        formData.append(
+          "image",
+          menuForm.image
+        );
       }
 
       let response;
@@ -331,23 +511,28 @@ export default function ShopOwnerPage() {
           }
         );
       } else {
-        response = await fetch("/api/shopowner/menu", {
-          method: "POST",
-          body: formData,
-        });
+        response = await fetch(
+          "/api/shopowner/menu",
+          {
+            method: "POST",
+            body: formData,
+          }
+        );
       }
 
       const data = await response.json();
 
       if (!response.ok || !data.success) {
         alert(
-          data.message || "Unable to save menu."
+          data.message ||
+            "Unable to save menu."
         );
         return;
       }
 
       setShowMenuModal(false);
       setEditingItem(null);
+      resetMenuForm();
 
       await loadMenu();
     } catch (error) {
@@ -360,7 +545,7 @@ export default function ShopOwnerPage() {
 
   async function deleteMenu(item) {
     const confirmed = window.confirm(
-      `Are you sure you want to delete "${item.name}"?`
+      `Delete "${item.name}" from your menu?`
     );
 
     if (!confirmed) return;
@@ -377,7 +562,8 @@ export default function ShopOwnerPage() {
 
       if (!response.ok || !data.success) {
         alert(
-          data.message || "Unable to delete menu."
+          data.message ||
+            "Unable to delete menu."
         );
         return;
       }
@@ -389,14 +575,15 @@ export default function ShopOwnerPage() {
     }
   }
 
-  // =====================================================
+  // =========================================================
   // ORDER STATUS
-  // =====================================================
+  // =========================================================
 
-  async function updateOrderStatus(order, newStatus) {
-    if (!order?.order_id) {
-      return;
-    }
+  async function updateOrderStatus(
+    order,
+    newStatus
+  ) {
+    if (!order?.order_id) return;
 
     setUpdatingOrderId(order.order_id);
 
@@ -425,7 +612,6 @@ export default function ShopOwnerPage() {
         return;
       }
 
-      // Immediately update UI
       setOrders((previous) =>
         previous.map((item) =>
           item.order_id === order.order_id
@@ -437,7 +623,20 @@ export default function ShopOwnerPage() {
         )
       );
 
-      // Refresh from database
+      if (
+        selectedOrder?.order_id ===
+        order.order_id
+      ) {
+        setSelectedOrder((previous) =>
+          previous
+            ? {
+                ...previous,
+                order_status: newStatus,
+              }
+            : previous
+        );
+      }
+
       await loadOrders(false);
     } catch (error) {
       console.error(
@@ -451,341 +650,9 @@ export default function ShopOwnerPage() {
     }
   }
 
-  // =====================================================
-  // ORDER STATUS UI
-  // =====================================================
-
-  function getStatusStyle(status) {
-    if (status === "pending") {
-      return "bg-gray-100 text-gray-600";
-    }
-
-    if (status === "confirmed") {
-      return "bg-blue-50 text-blue-600";
-    }
-
-    if (status === "preparing") {
-      return "bg-orange-50 text-orange-600";
-    }
-
-    if (status === "ready") {
-      return "bg-green-50 text-green-600";
-    }
-
-    if (status === "cancelled") {
-      return "bg-red-50 text-red-600";
-    }
-
-    return "bg-gray-100 text-gray-600";
-  }
-
-  function getStatusLabel(status) {
-    if (status === "pending") return "Pending";
-    if (status === "confirmed") return "Confirmed";
-    if (status === "preparing") return "Preparing";
-    if (status === "ready") return "Ready";
-    if (status === "cancelled") return "Cancelled";
-
-    return status || "Unknown";
-  }
-
-  // =====================================================
-  // ORDER CARD
-  // =====================================================
-
-  function OrderCard({ order }) {
-    const status = order.order_status;
-
-    const isUpdating =
-      updatingOrderId === order.order_id;
-
-    const isDelivery =
-      order.fulfillment_type === "delivery";
-
-    return (
-      <div className="bg-white rounded-2xl border border-[#e9e1d8] overflow-hidden shadow-sm">
-
-        {/* ORDER HEADER */}
-
-        <div className="px-6 py-5 border-b border-[#eee7df] flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-
-          <div>
-            <div className="text-xs text-[#8b9bb0] uppercase tracking-wide">
-              Order
-            </div>
-
-            <div className="text-2xl font-bold">
-              #{order.order_id}
-            </div>
-
-            <div className="text-xs text-gray-400 mt-1">
-              Checkout #{order.checkout_id}
-            </div>
-          </div>
-
-          <div className="flex flex-col items-start md:items-end gap-2">
-
-            <span
-              className={`px-3 py-1.5 rounded-full text-xs font-bold ${getStatusStyle(
-                status
-              )}`}
-            >
-              {getStatusLabel(status)}
-            </span>
-
-            <span className="text-sm text-gray-500">
-              {isDelivery
-                ? "🚚 Delivery"
-                : "🏪 Pickup"}
-            </span>
-
-          </div>
-
-        </div>
-
-        {/* ORDER BODY */}
-
-        <div className="px-6 py-5">
-
-          {/* CUSTOMER */}
-
-          <div className="mb-5">
-
-            <div className="text-xs text-[#8b9bb0] uppercase tracking-wide mb-1">
-              Customer
-            </div>
-
-            <div className="font-bold text-lg">
-              {order.student_name || "Customer"}
-            </div>
-
-            <div className="text-sm text-[#55708d] mt-1">
-              {order.delivery_phone ||
-                order.student_phone ||
-                "No phone number"}
-            </div>
-
-          </div>
-
-          {/* DELIVERY INFO */}
-
-          {isDelivery && (
-            <div className="mb-5 bg-[#faf7f2] rounded-xl p-4">
-
-              <div className="text-xs text-[#8b9bb0] uppercase tracking-wide mb-2">
-                Delivery Information
-              </div>
-
-              <div className="text-sm">
-
-                <div className="font-semibold">
-                  Building
-                </div>
-
-                <div className="text-gray-600 mb-2">
-                  {order.building_number ||
-                    "Not provided"}
-                </div>
-
-                {order.delivery_note && (
-                  <>
-                    <div className="font-semibold">
-                      Note
-                    </div>
-
-                    <div className="text-gray-600">
-                      {order.delivery_note}
-                    </div>
-                  </>
-                )}
-
-              </div>
-
-            </div>
-          )}
-
-          {/* ITEMS */}
-
-          <div>
-
-            <div className="text-xs text-[#8b9bb0] uppercase tracking-wide mb-3">
-              Items
-            </div>
-
-            <div className="space-y-3">
-
-              {(order.items || []).map((item) => (
-                <div
-                  key={item.order_item_id}
-                  className="flex items-center justify-between gap-4 border-b border-[#eee7df] pb-3"
-                >
-
-                  <div className="min-w-0">
-
-                    <div className="font-bold text-sm">
-                      {item.menu_name}
-                    </div>
-
-                    <div className="text-xs text-gray-500 mt-1">
-                      Quantity: {item.quantity}
-                    </div>
-
-                  </div>
-
-                  <div className="font-bold whitespace-nowrap">
-                    ฿
-                    {Number(
-                      item.subtotal ??
-                        Number(item.price) *
-                          Number(item.quantity)
-                    ).toFixed(2)}
-                  </div>
-
-                </div>
-              ))}
-
-            </div>
-
-          </div>
-
-          {/* SHOP / TOTAL */}
-
-          <div className="mt-5 pt-4 border-t border-[#eee7df] flex items-end justify-between">
-
-            <div>
-
-              <div className="text-xs text-[#8b9bb0] uppercase tracking-wide">
-                Shop
-              </div>
-
-              <div className="font-bold">
-                {order.shop_name ||
-                  "Your Food Court"}
-              </div>
-
-            </div>
-
-            <div className="text-right">
-
-              <div className="text-xs text-[#8b9bb0] uppercase tracking-wide">
-                Total
-              </div>
-
-              <div className="text-xl font-bold">
-                ฿
-                {Number(
-                  order.total_amount || 0
-                ).toFixed(2)}
-              </div>
-
-            </div>
-
-          </div>
-
-        </div>
-
-        {/* ACTION AREA */}
-
-        <div className="px-6 py-4 bg-[#faf8f5] border-t border-[#eee7df]">
-
-          <div className="flex flex-wrap justify-end gap-2">
-
-            {/* PENDING */}
-
-            {status === "pending" && (
-              <button
-                type="button"
-                disabled={isUpdating}
-                onClick={() =>
-                  updateOrderStatus(
-                    order,
-                    "confirmed"
-                  )
-                }
-                className="bg-blue-600 text-white rounded-lg px-5 py-2.5 text-sm font-semibold hover:bg-blue-700 disabled:opacity-50"
-              >
-                {isUpdating
-                  ? "Updating..."
-                  : "Confirm Order"}
-              </button>
-            )}
-
-            {/* CONFIRMED */}
-
-            {status === "confirmed" && (
-              <button
-                type="button"
-                disabled={isUpdating}
-                onClick={() =>
-                  updateOrderStatus(
-                    order,
-                    "preparing"
-                  )
-                }
-                className="bg-[#e84a25] text-white rounded-lg px-5 py-2.5 text-sm font-semibold hover:bg-[#d83d1d] disabled:opacity-50"
-              >
-                {isUpdating
-                  ? "Updating..."
-                  : "Start Preparing"}
-              </button>
-            )}
-
-            {/* PREPARING */}
-
-            {status === "preparing" && (
-              <button
-                type="button"
-                disabled={isUpdating}
-                onClick={() =>
-                  updateOrderStatus(
-                    order,
-                    "ready"
-                  )
-                }
-                className="bg-green-600 text-white rounded-lg px-5 py-2.5 text-sm font-semibold hover:bg-green-700 disabled:opacity-50"
-              >
-                {isUpdating
-                  ? "Updating..."
-                  : isDelivery
-                  ? "Ready for Delivery"
-                  : "Ready for Pickup"}
-              </button>
-            )}
-
-            {/* READY */}
-
-            {status === "ready" && (
-              <div className="flex items-center gap-2 text-green-600 font-semibold text-sm">
-                <span className="w-2 h-2 bg-green-500 rounded-full" />
-                {isDelivery
-                  ? "Waiting for Delivery"
-                  : "Ready for Pickup"}
-              </div>
-            )}
-
-            {/* VIEW */}
-
-            <button
-              type="button"
-              onClick={() =>
-                setSelectedOrder(order)
-              }
-              className="border border-[#ded5ca] bg-white rounded-lg px-5 py-2.5 text-sm font-semibold hover:bg-[#f5f1ec]"
-            >
-              View Order
-            </button>
-
-          </div>
-
-        </div>
-
-      </div>
-    );
-  }
-
-  // =====================================================
+  // =========================================================
   // ACCOUNT
-  // =====================================================
+  // =========================================================
 
   function handleAccountChange(event) {
     const {
@@ -795,10 +662,24 @@ export default function ShopOwnerPage() {
     } = event.target;
 
     if (name === "image") {
+      const file = files?.[0] || null;
+
       setAccountForm((previous) => ({
         ...previous,
-        image: files?.[0] || null,
+        image: file,
       }));
+
+      if (accountPreview) {
+        URL.revokeObjectURL(accountPreview);
+      }
+
+      if (file) {
+        setAccountPreview(
+          URL.createObjectURL(file)
+        );
+      } else {
+        setAccountPreview("");
+      }
 
       return;
     }
@@ -818,6 +699,7 @@ export default function ShopOwnerPage() {
       image: null,
     });
 
+    setAccountPreview("");
     setShowAccountModal(true);
   }
 
@@ -836,7 +718,7 @@ export default function ShopOwnerPage() {
 
       formData.append(
         "name",
-        accountForm.name
+        accountForm.name.trim()
       );
 
       formData.append(
@@ -877,6 +759,7 @@ export default function ShopOwnerPage() {
         image: null,
       });
 
+      setAccountPreview("");
       setShowAccountModal(false);
     } catch (error) {
       console.error(
@@ -884,17 +767,15 @@ export default function ShopOwnerPage() {
         error
       );
 
-      alert(
-        "Unable to update account."
-      );
+      alert("Unable to update account.");
     } finally {
       setSavingAccount(false);
     }
   }
 
-  // =====================================================
+  // =========================================================
   // LOGOUT
-  // =====================================================
+  // =========================================================
 
   async function handleLogout() {
     setProfileOpen(false);
@@ -913,763 +794,1826 @@ export default function ShopOwnerPage() {
     }
   }
 
-  // =====================================================
+  // =========================================================
+  // NAVIGATION
+  // =========================================================
+
+  function navigateTo(page) {
+    setActivePage(page);
+    setMobileSidebarOpen(false);
+    setProfileOpen(false);
+  }
+
+  // =========================================================
+  // STATUS HELPERS
+  // =========================================================
+
+  function getStatusStyle(status) {
+    switch (status) {
+      case "pending":
+        return "bg-amber-50 text-amber-700 border-amber-100";
+
+      case "confirmed":
+        return "bg-blue-50 text-blue-700 border-blue-100";
+
+      case "preparing":
+        return "bg-orange-50 text-orange-700 border-orange-100";
+
+      case "ready":
+        return "bg-emerald-50 text-emerald-700 border-emerald-100";
+
+      case "cancelled":
+        return "bg-red-50 text-red-700 border-red-100";
+
+      default:
+        return "bg-gray-50 text-gray-600 border-gray-100";
+    }
+  }
+
+  function getStatusLabel(status) {
+    switch (status) {
+      case "pending":
+        return "Pending";
+
+      case "confirmed":
+        return "Confirmed";
+
+      case "preparing":
+        return "Preparing";
+
+      case "ready":
+        return "Ready";
+
+      case "cancelled":
+        return "Cancelled";
+
+      default:
+        return status || "Unknown";
+    }
+  }
+
+  function getCategoryIcon(category) {
+    if (category === "Rice") return "🍚";
+    if (category === "Noodles") return "🍜";
+    return "🍽";
+  }
+
+  // =========================================================
+  // ICONS
+  // =========================================================
+
+  function Icon({
+    name,
+    size = 19,
+    stroke = 1.8,
+  }) {
+    const common = {
+      width: size,
+      height: size,
+      viewBox: "0 0 24 24",
+      fill: "none",
+      stroke: "currentColor",
+      strokeWidth: stroke,
+      strokeLinecap: "round",
+      strokeLinejoin: "round",
+      "aria-hidden": true,
+    };
+
+    if (name === "grid") {
+      return (
+        <svg {...common}>
+          <rect x="3" y="3" width="7" height="7" rx="1" />
+          <rect x="14" y="3" width="7" height="7" rx="1" />
+          <rect x="3" y="14" width="7" height="7" rx="1" />
+          <rect x="14" y="14" width="7" height="7" rx="1" />
+        </svg>
+      );
+    }
+
+    if (name === "menu") {
+      return (
+        <svg {...common}>
+          <path d="M4 6h16" />
+          <path d="M4 12h16" />
+          <path d="M4 18h16" />
+        </svg>
+      );
+    }
+
+    if (name === "utensils") {
+      return (
+        <svg {...common}>
+          <path d="M7 3v7" />
+          <path d="M4 3v4a3 3 0 0 0 6 0V3" />
+          <path d="M7 10v11" />
+          <path d="M17 3v18" />
+          <path d="M17 3c2.5 2 3 5 0 8" />
+        </svg>
+      );
+    }
+
+    if (name === "orders") {
+      return (
+        <svg {...common}>
+          <path d="M6 3h12v18H6z" />
+          <path d="M9 7h6" />
+          <path d="M9 11h6" />
+          <path d="M9 15h4" />
+        </svg>
+      );
+    }
+
+    if (name === "bell") {
+      return (
+        <svg {...common}>
+          <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+          <path d="M10 21h4" />
+        </svg>
+      );
+    }
+
+    if (name === "user") {
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="8" r="4" />
+          <path d="M4 21a8 8 0 0 1 16 0" />
+        </svg>
+      );
+    }
+
+    if (name === "settings") {
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="12" r="3" />
+          <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2 2-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V21h-2.8v-.8a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1-2-2 .1-.1A1.7 1.7 0 0 0 7.4 15a1.7 1.7 0 0 0-1.6-1H5v-2.8h.8a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L7 8.2l2-2 .1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.6V4h2.8v1a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1 2 2-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.8V14h-.8a1.7 1.7 0 0 0-1.6 1z" />
+        </svg>
+      );
+    }
+
+    if (name === "logout") {
+      return (
+        <svg {...common}>
+          <path d="M10 17l5-5-5-5" />
+          <path d="M15 12H3" />
+          <path d="M21 19V5a2 2 0 0 0-2-2h-6" />
+        </svg>
+      );
+    }
+
+    if (name === "plus") {
+      return (
+        <svg {...common}>
+          <path d="M12 5v14" />
+          <path d="M5 12h14" />
+        </svg>
+      );
+    }
+
+    if (name === "search") {
+      return (
+        <svg {...common}>
+          <circle cx="11" cy="11" r="7" />
+          <path d="m20 20-4-4" />
+        </svg>
+      );
+    }
+
+    if (name === "edit") {
+      return (
+        <svg {...common}>
+          <path d="M12 20h9" />
+          <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z" />
+        </svg>
+      );
+    }
+
+    if (name === "trash") {
+      return (
+        <svg {...common}>
+          <path d="M4 7h16" />
+          <path d="M10 11v6" />
+          <path d="M14 11v6" />
+          <path d="m9 7 1-3h4l1 3" />
+          <path d="M6 7l1 14h10l1-14" />
+        </svg>
+      );
+    }
+
+    if (name === "eye") {
+      return (
+        <svg {...common}>
+          <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z" />
+          <circle cx="12" cy="12" r="2.5" />
+        </svg>
+      );
+    }
+
+    if (name === "refresh") {
+      return (
+        <svg {...common}>
+          <path d="M20 11a8 8 0 0 0-14.8-4L3 9" />
+          <path d="M3 4v5h5" />
+          <path d="M4 13a8 8 0 0 0 14.8 4L21 15" />
+          <path d="M21 20v-5h-5" />
+        </svg>
+      );
+    }
+
+    if (name === "arrow") {
+      return (
+        <svg {...common}>
+          <path d="M5 12h14" />
+          <path d="m13 6 6 6-6 6" />
+        </svg>
+      );
+    }
+
+    if (name === "close") {
+      return (
+        <svg {...common}>
+          <path d="M6 6l12 12" />
+          <path d="M18 6 6 18" />
+        </svg>
+      );
+    }
+
+    if (name === "check") {
+      return (
+        <svg {...common}>
+          <path d="m5 12 4 4L19 6" />
+        </svg>
+      );
+    }
+
+    if (name === "clock") {
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 7v5l3 2" />
+        </svg>
+      );
+    }
+
+    if (name === "truck") {
+      return (
+        <svg {...common}>
+          <path d="M3 6h11v10H3z" />
+          <path d="M14 9h4l3 3v4h-7z" />
+          <circle cx="7" cy="18" r="2" />
+          <circle cx="18" cy="18" r="2" />
+        </svg>
+      );
+    }
+
+    return null;
+  }
+
+  // =========================================================
   // MENU CARD
-  // =====================================================
+  // =========================================================
 
   function MenuCard({ item }) {
+    const available =
+      item.availability === true ||
+      item.availability === 1;
+
     return (
-      <div className="bg-white rounded-xl border border-[#e9e1d8] overflow-hidden shadow-sm hover:shadow-md transition">
-
-        <div className="relative h-40 bg-[#f3eee8]">
-
+      <article className="group bg-white border border-[#ebe3da] rounded-[22px] overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_45px_rgba(35,28,20,0.08)]">
+        <div className="relative aspect-[4/3] bg-[#f3eee8] overflow-hidden">
           {item.image ? (
             <img
               src={item.image}
               alt={item.name}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.035]"
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-5xl">
-              🍛
+              {getCategoryIcon(item.category)}
             </div>
           )}
 
-          <div className="absolute top-2 right-2">
-
-            {item.availability ? (
-              <span className="bg-green-500 text-white px-2.5 py-1 rounded-full text-[11px] font-semibold">
-                Available
-              </span>
-            ) : (
-              <span className="bg-gray-500 text-white px-2.5 py-1 rounded-full text-[11px] font-semibold">
-                Unavailable
-              </span>
-            )}
-
-          </div>
-
-        </div>
-
-        <div className="p-4">
-
-          <div className="flex justify-between gap-3">
-
-            <h3 className="text-lg font-bold leading-tight">
-              {item.name}
-            </h3>
-
-            <span className="text-[#e84a25] font-bold whitespace-nowrap">
-              ฿
-              {Number(item.price).toFixed(2)}
+          <div className="absolute inset-x-0 top-0 p-3 flex items-start justify-between">
+            <span className="px-2.5 py-1.5 rounded-full bg-white/90 backdrop-blur-sm text-[10px] font-bold text-[#51483f] shadow-sm">
+              {item.category || "Other"}
             </span>
 
-          </div>
-
-          {item.description && (
-            <p className="text-gray-500 text-xs mt-2 line-clamp-2">
-              {item.description}
-            </p>
-          )}
-
-          <div className="flex gap-2 mt-4">
-
-            <button
-              type="button"
-              onClick={() =>
-                openEditMenu(item)
-              }
-              className="flex-1 border border-[#ded5ca] rounded-lg py-2 text-xs font-semibold hover:bg-[#f8f3ed]"
+            <span
+              className={`px-2.5 py-1.5 rounded-full backdrop-blur-sm text-[10px] font-bold shadow-sm ${
+                available
+                  ? "bg-emerald-500 text-white"
+                  : "bg-[#2b2926]/85 text-white"
+              }`}
             >
-              ✏️ Edit
-            </button>
-
-            <button
-              type="button"
-              onClick={() =>
-                deleteMenu(item)
-              }
-              className="flex-1 border border-red-200 text-red-500 rounded-lg py-2 text-xs font-semibold hover:bg-red-50"
-            >
-              🗑️ Delete
-            </button>
-
+              {available
+                ? "Available"
+                : "Unavailable"}
+            </span>
           </div>
-
         </div>
 
-      </div>
+        <div className="p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <h3 className="font-bold text-[17px] leading-tight truncate">
+                {item.name}
+              </h3>
+
+              {item.description && (
+                <p className="text-[12px] leading-5 text-[#81786f] mt-1.5 line-clamp-2">
+                  {item.description}
+                </p>
+              )}
+            </div>
+
+            <div className="text-[#e84a25] font-bold text-[17px] whitespace-nowrap">
+              ฿{Number(item.price || 0).toFixed(2)}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 mt-5 pt-4 border-t border-[#eee8e1]">
+            <button
+              type="button"
+              onClick={() => openEditMenu(item)}
+              className="flex-1 h-10 rounded-xl border border-[#ded5ca] bg-white text-[#342f2b] text-xs font-bold flex items-center justify-center gap-2 hover:bg-[#f8f4ef] transition"
+            >
+              <Icon
+                name="edit"
+                size={14}
+              />
+              Edit
+            </button>
+
+            <button
+              type="button"
+              onClick={() => deleteMenu(item)}
+              className="h-10 px-4 rounded-xl border border-red-100 text-red-500 text-xs font-bold flex items-center justify-center gap-2 hover:bg-red-50 transition"
+            >
+              <Icon
+                name="trash"
+                size={14}
+              />
+              Delete
+            </button>
+          </div>
+        </div>
+      </article>
     );
   }
 
-  // =====================================================
-  // CATEGORY SECTION
-  // =====================================================
+  // =========================================================
+  // ORDER CARD
+  // =========================================================
 
-  function CategorySection({
-    title,
-    emoji,
-    items,
-  }) {
-    if (items.length === 0) {
-      return null;
-    }
+  function OrderCard({ order }) {
+    const status = order.order_status;
+
+    const isUpdating =
+      updatingOrderId === order.order_id;
+
+    const isDelivery =
+      order.fulfillment_type ===
+      "delivery";
 
     return (
-      <section className="mb-8">
+      <article className="bg-white border border-[#ebe3da] rounded-[22px] overflow-hidden shadow-[0_4px_20px_rgba(35,28,20,0.025)]">
+        <div className="p-5 md:p-6">
+          <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-5">
+            <div className="flex items-start gap-4">
+              <div className="w-11 h-11 rounded-2xl bg-[#fff1eb] text-[#e84a25] flex items-center justify-center flex-shrink-0">
+                <Icon
+                  name={
+                    isDelivery
+                      ? "truck"
+                      : "orders"
+                  }
+                  size={20}
+                />
+              </div>
 
-        <div className="flex items-center gap-3 mb-4">
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="font-bold text-lg">
+                    Order #{order.order_id}
+                  </h3>
 
-          <div className="w-10 h-10 rounded-lg bg-[#f8e9df] flex items-center justify-center text-xl">
-            {emoji}
+                  <span
+                    className={`px-2.5 py-1 rounded-full border text-[10px] font-bold ${getStatusStyle(
+                      status
+                    )}`}
+                  >
+                    {getStatusLabel(status)}
+                  </span>
+                </div>
+
+                <p className="text-xs text-[#8a8178] mt-1">
+                  Checkout #{order.checkout_id}
+                  {" · "}
+                  {isDelivery
+                    ? "Delivery"
+                    : "Pickup"}
+                </p>
+              </div>
+            </div>
+
+            <div className="lg:text-right">
+              <div className="text-[10px] uppercase tracking-[0.14em] font-bold text-[#9a9189]">
+                Total
+              </div>
+
+              <div className="text-xl font-bold mt-0.5">
+                ฿
+                {Number(
+                  order.total_amount || 0
+                ).toFixed(2)}
+              </div>
+            </div>
           </div>
 
-          <div>
+          <div className="grid md:grid-cols-2 gap-4 mt-6">
+            <div className="rounded-2xl bg-[#faf7f3] p-4">
+              <div className="text-[10px] uppercase tracking-[0.14em] font-bold text-[#9a9189] mb-2">
+                Customer
+              </div>
 
-            <h2 className="text-lg font-bold">
-              {title}
-            </h2>
+              <div className="font-bold text-sm">
+                {order.student_name ||
+                  "Customer"}
+              </div>
 
-            <p className="text-gray-500 text-xs">
-              {items.length}{" "}
-              {items.length === 1
-                ? "item"
-                : "items"}
-            </p>
+              <div className="text-xs text-[#6f6861] mt-1">
+                {order.delivery_phone ||
+                  order.student_phone ||
+                  "No phone number"}
+              </div>
+            </div>
 
+            <div className="rounded-2xl bg-[#faf7f3] p-4">
+              <div className="text-[10px] uppercase tracking-[0.14em] font-bold text-[#9a9189] mb-2">
+                {isDelivery
+                  ? "Delivery"
+                  : "Fulfillment"}
+              </div>
+
+              {isDelivery ? (
+                <>
+                  <div className="font-bold text-sm">
+                    {order.building_number ||
+                      "Building not provided"}
+                  </div>
+
+                  {order.delivery_note && (
+                    <div className="text-xs text-[#6f6861] mt-1 line-clamp-2">
+                      {order.delivery_note}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="font-bold text-sm">
+                  Customer Pickup
+                </div>
+              )}
+            </div>
           </div>
 
-        </div>
+          <div className="mt-6">
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-[10px] uppercase tracking-[0.14em] font-bold text-[#9a9189]">
+                Order Items
+              </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-
-          {items.map((item) => (
-            <MenuCard
-              key={item.menu_item_id}
-              item={item}
-            />
-          ))}
-
-        </div>
-
-      </section>
-    );
-  }
-
-  // =====================================================
-  // MAIN UI
-  // =====================================================
-
-  return (
-    <main className="min-h-screen bg-[#f8f6f3] text-[#171717] flex">
-
-      {/* ==================================================
-          SIDEBAR
-      ================================================== */}
-
-      <aside className="w-[250px] bg-[#211f1c] text-white min-h-screen flex flex-col flex-shrink-0">
-
-        <div className="px-6 py-6 border-b border-[#3a3631]">
-
-          <div className="text-2xl font-bold">
-            UniPlate
-          </div>
-
-          <div className="text-[#aaa19a] mt-1.5 text-xs">
-            Shop Management
-          </div>
-
-        </div>
-
-        <div className="px-3 py-5">
-
-          <button
-            type="button"
-            onClick={() =>
-              setActivePage("menu")
-            }
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl mb-2 transition ${
-              activePage === "menu"
-                ? "bg-[#e84a25] text-white"
-                : "text-[#b9b1aa] hover:bg-[#2d2925]"
-            }`}
-          >
-            <span>🍽️</span>
-
-            <span className="font-semibold text-sm">
-              Menu
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() =>
-              setActivePage("orders")
-            }
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition ${
-              activePage === "orders"
-                ? "bg-[#e84a25] text-white"
-                : "text-[#b9b1aa] hover:bg-[#2d2925]"
-            }`}
-          >
-            <span>📦</span>
-
-            <span className="font-semibold text-sm">
-              Orders
-            </span>
-
-            {orders.filter(
-              (order) =>
-                order.order_status ===
-                "confirmed"
-            ).length > 0 && (
-              <span className="ml-auto bg-white text-[#e84a25] text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
-                {
-                  orders.filter(
-                    (order) =>
-                      order.order_status ===
-                      "confirmed"
-                  ).length
-                }
+              <span className="text-xs text-[#9a9189]">
+                {(order.items || []).length}{" "}
+                item
+                {(order.items || []).length !== 1
+                  ? "s"
+                  : ""}
               </span>
-            )}
-          </button>
+            </div>
 
-        </div>
-
-        <div className="mt-auto">
-
-          <div className="border-t border-[#3a3631] px-4 py-4">
-
-            <div className="flex items-center gap-2.5">
-
-              <div className="w-10 h-10 rounded-full bg-[#2d2925] overflow-hidden flex items-center justify-center flex-shrink-0">
-
-                {account?.shop_image ? (
-                  <img
-                    src={account.shop_image}
-                    alt={
-                      account.name ||
-                      "Shop"
+            <div className="divide-y divide-[#eee8e1] border border-[#eee8e1] rounded-2xl overflow-hidden">
+              {(order.items || []).map(
+                (item) => (
+                  <div
+                    key={
+                      item.order_item_id
                     }
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <span>👨‍🍳</span>
-                )}
+                    className="flex items-center justify-between gap-4 px-4 py-3"
+                  >
+                    <div className="min-w-0">
+                      <div className="font-semibold text-sm truncate">
+                        {item.menu_name}
+                      </div>
 
-              </div>
+                      <div className="text-xs text-[#8a8178] mt-0.5">
+                        Quantity:{" "}
+                        {item.quantity}
+                      </div>
+                    </div>
 
-              <div className="min-w-0">
-
-                <div className="font-bold text-sm truncate">
-                  {account?.name ||
-                    "Shop Owner"}
-                </div>
-
-                <div className="text-[11px] text-[#aaa19a] truncate">
-                  {account?.name ||
-                    "Food Court"}
-                </div>
-
-              </div>
-
+                    <div className="font-bold text-sm whitespace-nowrap">
+                      ฿
+                      {Number(
+                        item.subtotal ??
+                          Number(
+                            item.price || 0
+                          ) *
+                            Number(
+                              item.quantity ||
+                                0
+                            )
+                      ).toFixed(2)}
+                    </div>
+                  </div>
+                )
+              )}
             </div>
-
           </div>
-
         </div>
 
-      </aside>
-
-      {/* ==================================================
-          MAIN AREA
-      ================================================== */}
-
-      <div className="flex-1 min-w-0">
-
-        {/* HEADER */}
-
-        <header className="h-[68px] bg-white border-b border-[#e5ddd2] flex items-center justify-between px-7">
-
-          <div>
-
-            <div className="text-xs text-[#8b9bb0]">
-              Shop Dashboard
-            </div>
-
-            <div className="text-lg font-bold">
-              {activePage === "menu"
-                ? "Menu Management"
-                : "Orders"}
-            </div>
-
-          </div>
-
-          <div className="flex items-center gap-3">
-
+        <div className="px-5 md:px-6 py-4 bg-[#fcfaf8] border-t border-[#eee8e1]">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <button
               type="button"
               onClick={() =>
-                setActivePage("orders")
+                setSelectedOrder(order)
               }
-              className="relative w-10 h-10 rounded-full bg-[#f7f3ee] flex items-center justify-center"
+              className="text-xs font-bold text-[#5c534b] hover:text-[#e84a25] flex items-center gap-1.5"
             >
-              <span className="text-lg">
-                🔔
-              </span>
-
-              {orders.some(
-                (order) =>
-                  order.order_status ===
-                    "confirmed" ||
-                  order.order_status ===
-                    "pending"
-              ) && (
-                <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-[#e84a25] rounded-full" />
-              )}
+              View full order
+              <Icon
+                name="arrow"
+                size={13}
+              />
             </button>
 
-            {/* PROFILE */}
+            <div className="flex flex-wrap gap-2 sm:justify-end">
+              {status === "pending" && (
+                <button
+                  type="button"
+                  disabled={isUpdating}
+                  onClick={() =>
+                    updateOrderStatus(
+                      order,
+                      "confirmed"
+                    )
+                  }
+                  className="h-10 px-4 rounded-xl bg-[#252320] text-white text-xs font-bold hover:bg-[#171614] disabled:opacity-50 transition"
+                >
+                  {isUpdating
+                    ? "Updating..."
+                    : "Confirm Order"}
+                </button>
+              )}
 
-            <div
-              ref={profileRef}
-              className="relative"
-            >
+              {status === "confirmed" && (
+                <button
+                  type="button"
+                  disabled={isUpdating}
+                  onClick={() =>
+                    updateOrderStatus(
+                      order,
+                      "preparing"
+                    )
+                  }
+                  className="h-10 px-4 rounded-xl bg-[#e84a25] text-white text-xs font-bold hover:bg-[#d83d1d] disabled:opacity-50 transition"
+                >
+                  {isUpdating
+                    ? "Updating..."
+                    : "Start Preparing"}
+                </button>
+              )}
+
+              {status === "preparing" && (
+                <button
+                  type="button"
+                  disabled={isUpdating}
+                  onClick={() =>
+                    updateOrderStatus(
+                      order,
+                      "ready"
+                    )
+                  }
+                  className="h-10 px-4 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 disabled:opacity-50 transition"
+                >
+                  {isUpdating
+                    ? "Updating..."
+                    : isDelivery
+                    ? "Ready for Delivery"
+                    : "Ready for Pickup"}
+                </button>
+              )}
+
+              {status === "ready" && (
+                <div className="h-10 px-4 rounded-xl bg-emerald-50 text-emerald-700 text-xs font-bold flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  {isDelivery
+                    ? "Waiting for Delivery"
+                    : "Ready for Pickup"}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </article>
+    );
+  }
+
+  // =========================================================
+  // STAT CARD
+  // =========================================================
+
+  function StatCard({
+    label,
+    value,
+    icon,
+    accent = false,
+    helper,
+    onClick,
+  }) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className={`text-left w-full bg-white border border-[#ebe3da] rounded-[22px] p-5 transition-all hover:-translate-y-0.5 hover:shadow-[0_14px_35px_rgba(35,28,20,0.06)] ${
+          onClick
+            ? "cursor-pointer"
+            : "cursor-default"
+        }`}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="text-[10px] uppercase tracking-[0.14em] font-bold text-[#9a9189]">
+              {label}
+            </div>
+
+            <div className="text-2xl font-bold mt-2">
+              {value}
+            </div>
+
+            {helper && (
+              <div className="text-xs text-[#8a8178] mt-1.5">
+                {helper}
+              </div>
+            )}
+          </div>
+
+          <div
+            className={`w-10 h-10 rounded-2xl flex items-center justify-center ${
+              accent
+                ? "bg-[#fff0e9] text-[#e84a25]"
+                : "bg-[#f5f1ec] text-[#5e564f]"
+            }`}
+          >
+            <Icon
+              name={icon}
+              size={19}
+            />
+          </div>
+        </div>
+      </button>
+    );
+  }
+
+  // =========================================================
+  // SIDEBAR
+  // =========================================================
+
+  function Sidebar() {
+    return (
+      <>
+        {mobileSidebarOpen && (
+          <button
+            type="button"
+            aria-label="Close menu"
+            onClick={() =>
+              setMobileSidebarOpen(false)
+            }
+            className="fixed inset-0 z-40 bg-black/40 lg:hidden"
+          />
+        )}
+
+        <aside
+          className={`fixed lg:sticky top-0 left-0 z-50 h-screen w-[270px] bg-[#211f1c] text-white flex flex-col flex-shrink-0 transition-transform duration-300 ${
+            mobileSidebarOpen
+              ? "translate-x-0"
+              : "-translate-x-full lg:translate-x-0"
+          }`}
+        >
+          <div className="px-6 py-7 border-b border-[#393530]">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-[25px] font-black tracking-[-0.04em]">
+                  UniPlate
+                </div>
+
+                <div className="text-[11px] text-[#a9a19a] mt-1">
+                  Shop Owner Portal
+                </div>
+              </div>
 
               <button
                 type="button"
                 onClick={() =>
-                  setProfileOpen(
-                    (previous) =>
-                      !previous
-                  )
+                  setMobileSidebarOpen(false)
                 }
-                className="flex items-center gap-2.5 rounded-xl px-2 py-1.5 hover:bg-[#f7f3ee] transition"
+                className="lg:hidden w-9 h-9 rounded-xl hover:bg-[#302d29] flex items-center justify-center text-[#aaa29b]"
               >
+                <Icon
+                  name="close"
+                  size={17}
+                />
+              </button>
+            </div>
+          </div>
 
-                <div className="w-9 h-9 rounded-full bg-[#f5e9df] overflow-hidden flex items-center justify-center">
+          <div className="px-3 py-5">
+            <div className="px-3 mb-3 text-[9px] uppercase tracking-[0.18em] font-bold text-[#706a64]">
+              Workspace
+            </div>
 
-                  {account?.shop_image ? (
-                    <img
-                      src={
-                        account.shop_image
-                      }
-                      alt={
-                        account.name ||
-                        "Shop"
-                      }
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <span>👨‍🍳</span>
-                  )}
+            <SidebarButton
+              active={
+                activePage === "overview"
+              }
+              icon="grid"
+              label="Overview"
+              onClick={() =>
+                navigateTo("overview")
+              }
+            />
 
-                </div>
+            <SidebarButton
+              active={
+                activePage === "menu"
+              }
+              icon="utensils"
+              label="Menu"
+              onClick={() =>
+                navigateTo("menu")
+              }
+              badge={
+                totalMenuItems > 0
+                  ? totalMenuItems
+                  : null
+              }
+            />
 
-                <div className="text-left max-w-[170px]">
+            <SidebarButton
+              active={
+                activePage === "orders"
+              }
+              icon="orders"
+              label="Orders"
+              onClick={() =>
+                navigateTo("orders")
+              }
+              badge={
+                needsAttention > 0
+                  ? needsAttention
+                  : null
+              }
+            />
+          </div>
 
+          <div className="mt-auto px-4 pb-5">
+            <div className="border-t border-[#393530] pt-4">
+              <div className="flex items-center gap-3 px-2">
+                <Avatar
+                  account={account}
+                  size="sm"
+                />
+
+                <div className="min-w-0">
                   <div className="font-bold text-sm truncate">
                     {account?.name ||
                       "Shop Owner"}
                   </div>
 
-                  <div className="text-[11px] text-[#8b9bb0]">
-                    Shop Owner
+                  <div className="text-[10px] text-[#918981] truncate">
+                    {account?.email ||
+                      "Shop account"}
                   </div>
-
                 </div>
+              </div>
 
-                <span
-                  className={`text-gray-400 text-xs transition-transform ${
-                    profileOpen
-                      ? "rotate-180"
-                      : ""
-                  }`}
-                >
-                  ▼
-                </span>
-
+              <button
+                type="button"
+                onClick={
+                  openAccountManagement
+                }
+                className="w-full mt-4 h-10 rounded-xl text-[#bdb5ad] hover:text-white hover:bg-[#302d29] text-xs font-semibold flex items-center gap-2.5 px-3 transition"
+              >
+                <Icon
+                  name="settings"
+                  size={15}
+                />
+                Account settings
               </button>
-
-              {profileOpen && (
-                <div className="absolute right-0 top-[52px] w-[270px] bg-white rounded-xl border border-[#e5ddd2] shadow-xl z-50 overflow-hidden">
-
-                  <div className="px-4 py-4 bg-[#faf7f2] border-b border-[#eee5dc]">
-
-                    <div className="flex items-center gap-3">
-
-                      <div className="w-11 h-11 rounded-full bg-[#f5e9df] overflow-hidden flex items-center justify-center">
-
-                        {account?.shop_image ? (
-                          <img
-                            src={
-                              account.shop_image
-                            }
-                            alt={
-                              account.name ||
-                              "Shop"
-                            }
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <span>👨‍🍳</span>
-                        )}
-
-                      </div>
-
-                      <div className="min-w-0">
-
-                        <div className="font-bold text-sm truncate">
-                          {account?.name ||
-                            "Shop Owner"}
-                        </div>
-
-                        <div className="text-xs text-gray-500 truncate">
-                          {account?.email ||
-                            ""}
-                        </div>
-
-                      </div>
-
-                    </div>
-
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={openAccountManagement}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-[#f8f5f1] transition"
-                  >
-                    <span>⚙️</span>
-
-                    <div>
-                      <div className="text-sm font-semibold">
-                        Account Management
-                      </div>
-
-                      <div className="text-[11px] text-gray-500">
-                        Edit shop information
-                      </div>
-                    </div>
-                  </button>
-
-                  <div className="border-t border-[#eee5dc]" />
-
-                  <button
-                    type="button"
-                    onClick={handleLogout}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-left text-red-500 hover:bg-red-50 transition"
-                  >
-                    <span>🚪</span>
-
-                    <span className="text-sm font-semibold">
-                      Logout
-                    </span>
-                  </button>
-
-                </div>
-              )}
-
             </div>
-
           </div>
+        </aside>
+      </>
+    );
+  }
 
-        </header>
+  function SidebarButton({
+    active,
+    icon,
+    label,
+    onClick,
+    badge,
+  }) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className={`w-full h-12 px-4 rounded-xl flex items-center gap-3 mb-1.5 transition ${
+          active
+            ? "bg-[#e84a25] text-white shadow-[0_8px_20px_rgba(232,74,37,0.2)]"
+            : "text-[#aaa29b] hover:bg-[#302d29] hover:text-white"
+        }`}
+      >
+        <Icon
+          name={icon}
+          size={18}
+        />
 
-        {/* ==================================================
-            CONTENT
-        ================================================== */}
+        <span className="text-sm font-semibold">
+          {label}
+        </span>
 
-        <div className="px-7 py-7">
+        {badge && (
+          <span
+            className={`ml-auto min-w-5 h-5 px-1.5 rounded-full flex items-center justify-center text-[9px] font-bold ${
+              active
+                ? "bg-white text-[#e84a25]"
+                : "bg-[#3b3733] text-[#d8d0c8]"
+            }`}
+          >
+            {badge}
+          </span>
+        )}
+      </button>
+    );
+  }
 
-          {/* =================================================
-              ORDERS
-          ================================================= */}
+  function Avatar({
+    account: avatarAccount,
+    size = "md",
+  }) {
+    const dimensions =
+      size === "sm"
+        ? "w-9 h-9"
+        : "w-10 h-10";
 
-          {activePage === "orders" ? (
+    return (
+      <div
+        className={`${dimensions} rounded-full bg-[#f4e7dc] overflow-hidden flex items-center justify-center flex-shrink-0`}
+      >
+        {avatarAccount?.shop_image ? (
+          <img
+            src={avatarAccount.shop_image}
+            alt={
+              avatarAccount.name ||
+              "Shop"
+            }
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <Icon
+            name="user"
+            size={
+              size === "sm"
+                ? 16
+                : 18
+            }
+          />
+        )}
+      </div>
+    );
+  }
 
-            <div>
+  // =========================================================
+  // HEADER
+  // =========================================================
 
-              <div className="mb-6">
+  function Header() {
+    const pageTitle =
+      activePage === "overview"
+        ? "Overview"
+        : activePage === "menu"
+        ? "Menu Management"
+        : "Order Management";
 
-                <div className="text-[#e84a25] font-semibold text-sm mb-1">
-                  Orders 📦
-                </div>
+    return (
+      <header className="sticky top-0 z-30 h-[72px] bg-white/95 backdrop-blur-md border-b border-[#e9e2da] flex items-center justify-between px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center gap-3 min-w-0">
+          <button
+            type="button"
+            onClick={() =>
+              setMobileSidebarOpen(true)
+            }
+            className="lg:hidden w-10 h-10 rounded-xl bg-[#f7f3ee] flex items-center justify-center"
+          >
+            <Icon
+              name="menu"
+              size={19}
+            />
+          </button>
 
-                <h1 className="text-3xl font-bold">
-                  Manage your orders
-                </h1>
-
-                <p className="text-gray-500 text-sm mt-1">
-                  View and manage orders from your customers.
-                </p>
-
-              </div>
-
-              {orderMessage && (
-                <div className="mb-5 bg-red-50 text-red-600 border border-red-200 rounded-lg px-4 py-3 text-sm">
-                  {orderMessage}
-                </div>
-              )}
-
-              {loadingOrders ? (
-
-                <div className="bg-white rounded-xl border border-[#e9e1d8] p-12 text-center">
-                  <div className="text-4xl mb-3">
-                    📦
-                  </div>
-
-                  <div className="font-semibold">
-                    Loading orders...
-                  </div>
-
-                  <div className="text-gray-500 text-sm mt-1">
-                    Please wait.
-                  </div>
-                </div>
-
-              ) : orders.length === 0 ? (
-
-                <div className="bg-white rounded-xl border border-[#e9e1d8] p-12 text-center">
-
-                  <div className="text-5xl mb-4">
-                    📦
-                  </div>
-
-                  <h2 className="text-xl font-bold">
-                    No orders yet
-                  </h2>
-
-                  <p className="text-gray-500 text-sm mt-1">
-                    New customer orders will appear here.
-                  </p>
-
-                </div>
-
-              ) : (
-
-                <div className="space-y-5">
-
-                  {orders.map((order) => (
-                    <OrderCard
-                      key={order.order_id}
-                      order={order}
-                    />
-                  ))}
-
-                </div>
-
-              )}
-
+          <div className="min-w-0">
+            <div className="hidden sm:block text-[10px] uppercase tracking-[0.16em] font-bold text-[#9a9189]">
+              Shop Dashboard
             </div>
 
-          ) : (
-
-            /* =================================================
-               MENU
-            ================================================= */
-
-            <>
-
-              <div className="mb-6">
-
-                <div className="text-[#e84a25] font-semibold text-sm mb-1">
-                  Welcome back 👋
-                </div>
-
-                <h1 className="text-3xl font-bold">
-                  Manage your menu
-                </h1>
-
-                <p className="text-gray-500 text-sm mt-1">
-                  Add your food, upload your own images,
-                  and organize your menu.
-                </p>
-
-              </div>
-
-              {/* STATISTICS */}
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-7">
-
-                <div className="bg-white rounded-xl border border-[#e9e1d8] px-5 py-4">
-
-                  <div className="text-xs text-[#8b9bb0]">
-                    Total Menu Items
-                  </div>
-
-                  <div className="text-2xl font-bold mt-1">
-                    {totalMenuItems}
-                  </div>
-
-                </div>
-
-                <div className="bg-white rounded-xl border border-[#e9e1d8] px-5 py-4">
-
-                  <div className="text-xs text-[#8b9bb0]">
-                    Menu Groups
-                  </div>
-
-                  <div className="text-2xl font-bold mt-1">
-                    {menuGroups}
-                  </div>
-
-                </div>
-
-                <div className="bg-white rounded-xl border border-[#e9e1d8] px-5 py-4">
-
-                  <div className="text-xs text-[#8b9bb0]">
-                    Available Items
-                  </div>
-
-                  <div className="text-2xl font-bold mt-1">
-                    {availableItems}
-                  </div>
-
-                </div>
-
-              </div>
-
-              {/* MENU HEADER */}
-
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-6">
-
-                <div>
-
-                  <h2 className="text-xl font-bold">
-                    Your Menu
-                  </h2>
-
-                  <p className="text-gray-500 text-xs mt-1">
-                    {riceItems.length} Rice ·{" "}
-                    {noodleItems.length} Noodles
-                    {otherItems.length > 0 &&
-                      ` · ${otherItems.length} Other`}
-                  </p>
-
-                </div>
-
-                <div className="flex gap-2">
-
-                  <input
-                    type="text"
-                    value={search}
-                    onChange={(event) =>
-                      setSearch(
-                        event.target.value
-                      )
-                    }
-                    placeholder="🔍 Search menu..."
-                    className="w-[230px] border border-[#ded5ca] bg-white rounded-lg py-2.5 px-3 text-sm outline-none focus:border-[#e84a25]"
-                  />
-
-                  <button
-                    type="button"
-                    onClick={openAddMenu}
-                    className="bg-[#e84a25] text-white rounded-lg px-4 py-2.5 text-sm font-semibold hover:bg-[#d83d1d]"
-                  >
-                    + Add Menu
-                  </button>
-
-                </div>
-
-              </div>
-
-              {menuMessage && (
-                <div className="mb-5 bg-red-50 text-red-600 border border-red-200 rounded-lg px-4 py-3 text-sm">
-                  {menuMessage}
-                </div>
-              )}
-
-              {loadingMenu ? (
-
-                <div className="bg-white rounded-xl p-10 text-center text-sm">
-                  Loading your menu...
-                </div>
-
-              ) : filteredItems.length === 0 ? (
-
-                <div className="bg-white rounded-xl border border-[#e9e1d8] p-12 text-center">
-
-                  <div className="text-5xl mb-4">
-                    🍽️
-                  </div>
-
-                  <h2 className="text-xl font-bold">
-                    No menu items yet
-                  </h2>
-
-                  <p className="text-gray-500 text-sm mt-1 mb-5">
-                    Add your first food item to your shop.
-                  </p>
-
-                  <button
-                    type="button"
-                    onClick={openAddMenu}
-                    className="bg-[#e84a25] text-white rounded-lg px-5 py-2.5 text-sm font-semibold"
-                  >
-                    + Add Menu
-                  </button>
-
-                </div>
-
-              ) : (
-
-                <>
-
-                  <CategorySection
-                    title="Rice"
-                    emoji="🍚"
-                    items={riceItems}
-                  />
-
-                  <CategorySection
-                    title="Noodles"
-                    emoji="🍜"
-                    items={noodleItems}
-                  />
-
-                  <CategorySection
-                    title="Other"
-                    emoji="🍽️"
-                    items={otherItems}
-                  />
-
-                </>
-
-              )}
-
-            </>
-
-          )}
-
+            <div className="font-bold text-base sm:text-lg truncate">
+              {pageTitle}
+            </div>
+          </div>
         </div>
 
-      </div>
+        <div className="flex items-center gap-2 sm:gap-3">
+          <button
+            type="button"
+            onClick={() =>
+              loadOrders(false)
+            }
+            className="w-10 h-10 rounded-xl bg-[#f7f3ee] text-[#554d46] flex items-center justify-center hover:bg-[#eee8e1] transition"
+            title="Refresh orders"
+          >
+            <Icon
+              name="refresh"
+              size={17}
+            />
+          </button>
 
-      {/* ==================================================
-          VIEW ORDER MODAL
-      ================================================== */}
+          <button
+            type="button"
+            onClick={() =>
+              navigateTo("orders")
+            }
+            className="relative w-10 h-10 rounded-xl bg-[#f7f3ee] text-[#554d46] flex items-center justify-center hover:bg-[#eee8e1] transition"
+            title="Orders"
+          >
+            <Icon
+              name="bell"
+              size={17}
+            />
 
-      {selectedOrder && (
+            {needsAttention > 0 && (
+              <span className="absolute top-2 right-2 w-2 h-2 bg-[#e84a25] rounded-full ring-2 ring-white" />
+            )}
+          </button>
 
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div
+            ref={profileRef}
+            className="relative"
+          >
+            <button
+              type="button"
+              onClick={() =>
+                setProfileOpen(
+                  (previous) =>
+                    !previous
+                )
+              }
+              className="flex items-center gap-2 rounded-xl p-1.5 sm:pr-2 hover:bg-[#f7f3ee] transition"
+            >
+              <Avatar
+                account={account}
+                size="sm"
+              />
 
-          <div className="bg-white rounded-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto">
-
-            <div className="px-6 py-5 border-b flex items-center justify-between">
-
-              <div>
-
-                <div className="text-xs text-gray-400">
-                  ORDER
+              <div className="hidden md:block text-left max-w-[130px]">
+                <div className="font-bold text-xs truncate">
+                  {account?.name ||
+                    "Shop Owner"}
                 </div>
 
-                <h2 className="text-2xl font-bold">
-                  #{selectedOrder.order_id}
+                <div className="text-[10px] text-[#9a9189]">
+                  Shop Owner
+                </div>
+              </div>
+
+              <span className="hidden sm:block text-[#9a9189] text-xs">
+                {profileOpen
+                  ? "⌃"
+                  : "⌄"}
+              </span>
+            </button>
+
+            {profileOpen && (
+              <div className="absolute right-0 top-[54px] w-[285px] bg-white rounded-2xl border border-[#e5ddd4] shadow-[0_20px_60px_rgba(35,28,20,0.14)] overflow-hidden z-50">
+                <div className="p-4 bg-[#faf7f3] border-b border-[#eee7df]">
+                  <div className="flex items-center gap-3">
+                    <Avatar
+                      account={account}
+                    />
+
+                    <div className="min-w-0">
+                      <div className="font-bold text-sm truncate">
+                        {account?.name ||
+                          "Shop Owner"}
+                      </div>
+
+                      <div className="text-xs text-[#81786f] truncate mt-0.5">
+                        {account?.email ||
+                          ""}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={
+                    openAccountManagement
+                  }
+                  className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-[#faf7f3] transition"
+                >
+                  <span className="w-8 h-8 rounded-lg bg-[#f5f1ec] flex items-center justify-center text-[#5b534c]">
+                    <Icon
+                      name="settings"
+                      size={15}
+                    />
+                  </span>
+
+                  <div>
+                    <div className="text-xs font-bold">
+                      Account Management
+                    </div>
+
+                    <div className="text-[10px] text-[#8a8178] mt-0.5">
+                      Edit shop information
+                    </div>
+                  </div>
+                </button>
+
+                <div className="border-t border-[#eee7df]" />
+
+                <button
+                  type="button"
+                  onClick={
+                    handleLogout
+                  }
+                  className="w-full flex items-center gap-3 px-4 py-3.5 text-left text-red-500 hover:bg-red-50 transition"
+                >
+                  <span className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center">
+                    <Icon
+                      name="logout"
+                      size={15}
+                    />
+                  </span>
+
+                  <span className="text-xs font-bold">
+                    Logout
+                  </span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </header>
+    );
+  }
+
+  // =========================================================
+  // OVERVIEW
+  // =========================================================
+
+  function OverviewPage() {
+    const recentOrders = orders.slice(
+      0,
+      5
+    );
+
+    return (
+      <div className="space-y-7">
+        <section>
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+            <div>
+              <div className="text-[#e84a25] text-xs font-bold uppercase tracking-[0.16em]">
+                Welcome back
+              </div>
+
+              <h1 className="text-3xl sm:text-4xl font-black tracking-[-0.035em] mt-1">
+                {account?.name ||
+                  "Your Shop"}
+              </h1>
+
+              <p className="text-sm text-[#81786f] mt-2 max-w-xl">
+                Keep your menu updated and
+                stay on top of incoming
+                customer orders.
+              </p>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() =>
+                  navigateTo("menu")
+                }
+                className="h-11 px-4 rounded-xl border border-[#ded5ca] bg-white text-xs font-bold hover:bg-[#f8f4ef] transition"
+              >
+                Manage Menu
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  navigateTo("orders")
+                }
+                className="h-11 px-4 rounded-xl bg-[#e84a25] text-white text-xs font-bold hover:bg-[#d83d1d] transition flex items-center gap-2"
+              >
+                View Orders
+                <Icon
+                  name="arrow"
+                  size={14}
+                />
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          <StatCard
+            label="Total Orders"
+            value={orderCounts.all}
+            icon="orders"
+            helper="All orders received"
+            onClick={() =>
+              navigateTo("orders")
+            }
+          />
+
+          <StatCard
+            label="Needs Attention"
+            value={needsAttention}
+            icon="clock"
+            accent={needsAttention > 0}
+            helper={
+              needsAttention > 0
+                ? "Orders waiting for action"
+                : "Everything is up to date"
+            }
+            onClick={() =>
+              navigateTo("orders")
+            }
+          />
+
+          <StatCard
+            label="Menu Items"
+            value={totalMenuItems}
+            icon="utensils"
+            helper={`${availableItems} currently available`}
+            onClick={() =>
+              navigateTo("menu")
+            }
+          />
+
+          <StatCard
+            label="Order Value"
+            value={`฿${todayRevenue.toFixed(
+              0
+            )}`}
+            icon="grid"
+            accent
+            helper="Current loaded orders"
+          />
+        </section>
+
+        <section className="grid grid-cols-1 xl:grid-cols-[1.35fr_0.65fr] gap-5">
+          <div className="bg-white border border-[#ebe3da] rounded-[24px] overflow-hidden">
+            <div className="px-5 py-5 border-b border-[#eee8e1] flex items-center justify-between gap-3">
+              <div>
+                <h2 className="font-bold text-base">
+                  Recent Orders
                 </h2>
 
+                <p className="text-xs text-[#8a8178] mt-1">
+                  Your latest customer activity
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  navigateTo("orders")
+                }
+                className="text-xs font-bold text-[#e84a25] hover:text-[#c83d1e]"
+              >
+                View all
+              </button>
+            </div>
+
+            {loadingOrders &&
+            orders.length === 0 ? (
+              <div className="p-10 text-center text-sm text-[#81786f]">
+                Loading orders...
+              </div>
+            ) : recentOrders.length === 0 ? (
+              <div className="p-10 text-center">
+                <div className="w-12 h-12 mx-auto rounded-2xl bg-[#f7f3ee] flex items-center justify-center text-[#766d65]">
+                  <Icon
+                    name="orders"
+                    size={21}
+                  />
+                </div>
+
+                <div className="font-bold text-sm mt-3">
+                  No orders yet
+                </div>
+
+                <p className="text-xs text-[#8a8178] mt-1">
+                  New customer orders will
+                  appear here.
+                </p>
+              </div>
+            ) : (
+              <div className="divide-y divide-[#eee8e1]">
+                {recentOrders.map(
+                  (order) => (
+                    <button
+                      type="button"
+                      key={order.order_id}
+                      onClick={() =>
+                        setSelectedOrder(
+                          order
+                        )
+                      }
+                      className="w-full text-left px-5 py-4 flex items-center justify-between gap-4 hover:bg-[#fcfaf8] transition"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-9 h-9 rounded-xl bg-[#fff1eb] text-[#e84a25] flex items-center justify-center flex-shrink-0">
+                          <Icon
+                            name="orders"
+                            size={15}
+                          />
+                        </div>
+
+                        <div className="min-w-0">
+                          <div className="font-bold text-sm truncate">
+                            #{order.order_id}
+                            {" · "}
+                            {order.student_name ||
+                              "Customer"}
+                          </div>
+
+                          <div className="text-[10px] text-[#8a8178] mt-1">
+                            {(
+                              order.items ||
+                              []
+                            ).length}{" "}
+                            items
+                            {" · "}
+                            {order.fulfillment_type ===
+                            "delivery"
+                              ? "Delivery"
+                              : "Pickup"}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="text-right flex-shrink-0">
+                        <div className="font-bold text-sm">
+                          ฿
+                          {Number(
+                            order.total_amount ||
+                              0
+                          ).toFixed(2)}
+                        </div>
+
+                        <div
+                          className={`inline-flex mt-1.5 px-2 py-0.5 rounded-full border text-[9px] font-bold ${getStatusStyle(
+                            order.order_status
+                          )}`}
+                        >
+                          {getStatusLabel(
+                            order.order_status
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  )
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-5">
+            <div className="bg-[#211f1c] text-white rounded-[24px] p-6">
+              <div className="text-[10px] uppercase tracking-[0.16em] text-[#aaa19a] font-bold">
+                Order Pipeline
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 mt-5">
+                <PipelineStat
+                  label="Pending"
+                  value={orderCounts.pending}
+                />
+
+                <PipelineStat
+                  label="Confirmed"
+                  value={orderCounts.confirmed}
+                />
+
+                <PipelineStat
+                  label="Preparing"
+                  value={orderCounts.preparing}
+                />
+
+                <PipelineStat
+                  label="Ready"
+                  value={orderCounts.ready}
+                />
+              </div>
+            </div>
+
+            <div className="bg-white border border-[#ebe3da] rounded-[24px] p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-[10px] uppercase tracking-[0.15em] text-[#9a9189] font-bold">
+                    Menu Health
+                  </div>
+
+                  <div className="font-bold text-lg mt-1">
+                    {availableItems} /{" "}
+                    {totalMenuItems}
+                  </div>
+                </div>
+
+                <div className="w-11 h-11 rounded-2xl bg-[#f5f1ec] flex items-center justify-center">
+                  <Icon
+                    name="utensils"
+                    size={20}
+                  />
+                </div>
+              </div>
+
+              <div className="h-2 bg-[#eee8e1] rounded-full mt-5 overflow-hidden">
+                <div
+                  className="h-full bg-[#e84a25] rounded-full transition-all"
+                  style={{
+                    width:
+                      totalMenuItems > 0
+                        ? `${Math.min(
+                            100,
+                            (availableItems /
+                              totalMenuItems) *
+                              100
+                          )}%`
+                        : "0%",
+                  }}
+                />
+              </div>
+
+              <p className="text-xs text-[#81786f] mt-3">
+                {menuGroups} menu{" "}
+                {menuGroups === 1
+                  ? "category"
+                  : "categories"}{" "}
+                available.
+              </p>
+            </div>
+          </div>
+        </section>
+      </div>
+    );
+  }
+
+  // =========================================================
+  // MENU PAGE
+  // =========================================================
+
+  function MenuPage() {
+    return (
+      <div className="space-y-7">
+        <section className="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-5">
+          <div>
+            <div className="text-[#e84a25] text-xs font-bold uppercase tracking-[0.16em]">
+              Menu
+            </div>
+
+            <h1 className="text-3xl sm:text-4xl font-black tracking-[-0.035em] mt-1">
+              Your Menu
+            </h1>
+
+            <p className="text-sm text-[#81786f] mt-2">
+              Manage dishes, prices, categories,
+              and food images.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={openAddMenu}
+            className="h-11 px-5 rounded-xl bg-[#e84a25] text-white text-xs font-bold flex items-center justify-center gap-2 hover:bg-[#d83d1d] transition"
+          >
+            <Icon
+              name="plus"
+              size={16}
+            />
+            Add Menu Item
+          </button>
+        </section>
+
+        <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <MiniStat
+            label="Items"
+            value={totalMenuItems}
+          />
+
+          <MiniStat
+            label="Available"
+            value={availableItems}
+          />
+
+          <MiniStat
+            label="Categories"
+            value={menuGroups}
+          />
+
+          <MiniStat
+            label="Unavailable"
+            value={
+              Math.max(
+                0,
+                totalMenuItems -
+                  availableItems
+              )
+            }
+          />
+        </section>
+
+        <section className="bg-white border border-[#ebe3da] rounded-[24px] p-4 sm:p-5">
+          <div className="flex flex-col lg:flex-row gap-4 lg:items-center lg:justify-between">
+            <div className="relative w-full lg:max-w-[330px]">
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#968d84]">
+                <Icon
+                  name="search"
+                  size={16}
+                />
+              </span>
+
+              <input
+                type="text"
+                value={menuSearch}
+                onChange={(event) =>
+                  setMenuSearch(
+                    event.target.value
+                  )
+                }
+                placeholder="Search your menu..."
+                className="w-full h-11 pl-10 pr-4 rounded-xl border border-[#ded5ca] bg-[#fcfaf8] text-sm outline-none focus:border-[#e84a25] focus:bg-white transition"
+              />
+            </div>
+
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {categories.map(
+                (category) => (
+                  <button
+                    type="button"
+                    key={category}
+                    onClick={() =>
+                      setMenuCategory(
+                        category
+                      )
+                    }
+                    className={`h-10 px-4 rounded-xl text-xs font-bold whitespace-nowrap transition ${
+                      menuCategory ===
+                      category
+                        ? "bg-[#211f1c] text-white"
+                        : "bg-[#f7f3ee] text-[#665d55] hover:bg-[#eee8e1]"
+                    }`}
+                  >
+                    {category ===
+                    "All"
+                      ? "All Items"
+                      : `${getCategoryIcon(
+                          category
+                        )} ${category}`}
+                  </button>
+                )
+              )}
+            </div>
+          </div>
+        </section>
+
+        {menuMessage && (
+          <div className="bg-red-50 border border-red-100 text-red-600 rounded-2xl px-4 py-3 text-sm">
+            {menuMessage}
+          </div>
+        )}
+
+        {loadingMenu ? (
+          <MenuSkeleton />
+        ) : filteredMenuItems.length ===
+          0 ? (
+          <div className="bg-white border border-[#ebe3da] rounded-[24px] p-14 text-center">
+            <div className="w-14 h-14 mx-auto rounded-2xl bg-[#f7f3ee] flex items-center justify-center">
+              <Icon
+                name="utensils"
+                size={24}
+              />
+            </div>
+
+            <h2 className="font-bold text-lg mt-4">
+              {menuItems.length === 0
+                ? "Your menu is empty"
+                : "No matching items"}
+            </h2>
+
+            <p className="text-sm text-[#81786f] mt-1 max-w-md mx-auto">
+              {menuItems.length === 0
+                ? "Add your first menu item and start building your food court menu."
+                : "Try another search term or category."}
+            </p>
+
+            {menuItems.length === 0 && (
+              <button
+                type="button"
+                onClick={
+                  openAddMenu
+                }
+                className="mt-5 h-10 px-5 rounded-xl bg-[#e84a25] text-white text-xs font-bold"
+              >
+                Add First Item
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+            {filteredMenuItems.map(
+              (item) => (
+                <MenuCard
+                  key={
+                    item.menu_item_id
+                  }
+                  item={item}
+                />
+              )
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // =========================================================
+  // ORDERS PAGE
+  // =========================================================
+
+  function OrdersPage() {
+    return (
+      <div className="space-y-7">
+        <section className="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-5">
+          <div>
+            <div className="text-[#e84a25] text-xs font-bold uppercase tracking-[0.16em]">
+              Orders
+            </div>
+
+            <h1 className="text-3xl sm:text-4xl font-black tracking-[-0.035em] mt-1">
+              Customer Orders
+            </h1>
+
+            <p className="text-sm text-[#81786f] mt-2">
+              Review orders and move them
+              through your kitchen workflow.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() =>
+              loadOrders(false)
+            }
+            className="h-11 px-4 rounded-xl border border-[#ded5ca] bg-white text-xs font-bold flex items-center justify-center gap-2 hover:bg-[#f8f4ef] transition"
+          >
+            <Icon
+              name="refresh"
+              size={15}
+            />
+            Refresh
+          </button>
+        </section>
+
+        <section className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+          <OrderFilter
+            label="All"
+            value={orderCounts.all}
+            active={
+              orderFilter === "all"
+            }
+            onClick={() =>
+              setOrderFilter("all")
+            }
+          />
+
+          <OrderFilter
+            label="Pending"
+            value={orderCounts.pending}
+            active={
+              orderFilter === "pending"
+            }
+            onClick={() =>
+              setOrderFilter("pending")
+            }
+          />
+
+          <OrderFilter
+            label="Confirmed"
+            value={orderCounts.confirmed}
+            active={
+              orderFilter === "confirmed"
+            }
+            onClick={() =>
+              setOrderFilter("confirmed")
+            }
+          />
+
+          <OrderFilter
+            label="Preparing"
+            value={orderCounts.preparing}
+            active={
+              orderFilter === "preparing"
+            }
+            onClick={() =>
+              setOrderFilter("preparing")
+            }
+          />
+
+          <OrderFilter
+            label="Ready"
+            value={orderCounts.ready}
+            active={
+              orderFilter === "ready"
+            }
+            onClick={() =>
+              setOrderFilter("ready")
+            }
+          />
+
+          <OrderFilter
+            label="Cancelled"
+            value={orderCounts.cancelled}
+            active={
+              orderFilter === "cancelled"
+            }
+            onClick={() =>
+              setOrderFilter("cancelled")
+            }
+          />
+        </section>
+
+        <section className="relative">
+          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#968d84]">
+            <Icon
+              name="search"
+              size={17}
+            />
+          </span>
+
+          <input
+            type="text"
+            value={orderSearch}
+            onChange={(event) =>
+              setOrderSearch(
+                event.target.value
+              )
+            }
+            placeholder="Search by order number, customer, phone, or building..."
+            className="w-full h-12 pl-11 pr-4 rounded-xl border border-[#ded5ca] bg-white text-sm outline-none focus:border-[#e84a25] transition"
+          />
+        </section>
+
+        {orderMessage && (
+          <div className="bg-red-50 border border-red-100 text-red-600 rounded-2xl px-4 py-3 text-sm">
+            {orderMessage}
+          </div>
+        )}
+
+        {loadingOrders &&
+        orders.length === 0 ? (
+          <div className="bg-white border border-[#ebe3da] rounded-[24px] p-14 text-center">
+            <div className="w-12 h-12 mx-auto rounded-2xl bg-[#f7f3ee] flex items-center justify-center">
+              <Icon
+                name="orders"
+                size={21}
+              />
+            </div>
+
+            <div className="font-bold mt-3">
+              Loading orders...
+            </div>
+
+            <div className="text-xs text-[#81786f] mt-1">
+              Please wait a moment.
+            </div>
+          </div>
+        ) : filteredOrders.length ===
+          0 ? (
+          <div className="bg-white border border-[#ebe3da] rounded-[24px] p-14 text-center">
+            <div className="w-14 h-14 mx-auto rounded-2xl bg-[#f7f3ee] flex items-center justify-center">
+              <Icon
+                name="orders"
+                size={24}
+              />
+            </div>
+
+            <h2 className="font-bold text-lg mt-4">
+              No orders found
+            </h2>
+
+            <p className="text-sm text-[#81786f] mt-1">
+              Try changing the filter or
+              search term.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {filteredOrders.map(
+              (order) => (
+                <OrderCard
+                  key={order.order_id}
+                  order={order}
+                />
+              )
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // =========================================================
+  // MAIN UI
+  // =========================================================
+
+  return (
+    <main className="min-h-screen bg-[#f8f6f3] text-[#211f1c]">
+      <div className="flex min-h-screen">
+        <Sidebar />
+
+        <div className="flex-1 min-w-0">
+          <Header />
+
+          <main className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8 max-w-[1600px] mx-auto">
+            {activePage ===
+              "overview" && (
+              <OverviewPage />
+            )}
+
+            {activePage === "menu" && (
+              <MenuPage />
+            )}
+
+            {activePage ===
+              "orders" && (
+              <OrdersPage />
+            )}
+          </main>
+        </div>
+      </div>
+
+      {/* =====================================================
+          VIEW ORDER MODAL
+      ===================================================== */}
+
+      {selectedOrder && (
+        <div
+          className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-[2px] flex items-center justify-center p-3 sm:p-5"
+          onMouseDown={(event) => {
+            if (
+              event.target ===
+              event.currentTarget
+            ) {
+              setSelectedOrder(null);
+            }
+          }}
+        >
+          <div className="bg-white rounded-[26px] w-full max-w-2xl max-h-[92vh] overflow-hidden shadow-[0_30px_100px_rgba(0,0,0,0.22)]">
+            <div className="px-5 sm:px-6 py-5 border-b border-[#eee8e1] flex items-center justify-between gap-4">
+              <div>
+                <div className="text-[10px] uppercase tracking-[0.16em] font-bold text-[#9a9189]">
+                  Order details
+                </div>
+
+                <div className="flex items-center gap-2 mt-1">
+                  <h2 className="text-2xl font-black">
+                    #{selectedOrder.order_id}
+                  </h2>
+
+                  <span
+                    className={`px-2.5 py-1 rounded-full border text-[10px] font-bold ${getStatusStyle(
+                      selectedOrder.order_status
+                    )}`}
+                  >
+                    {getStatusLabel(
+                      selectedOrder.order_status
+                    )}
+                  </span>
+                </div>
               </div>
 
               <button
@@ -1677,162 +2621,250 @@ export default function ShopOwnerPage() {
                 onClick={() =>
                   setSelectedOrder(null)
                 }
-                className="text-2xl text-gray-400 hover:text-black"
+                className="w-10 h-10 rounded-xl bg-[#f7f3ee] flex items-center justify-center text-[#665d55] hover:bg-[#eee8e1] transition"
               >
-                ×
+                <Icon
+                  name="close"
+                  size={18}
+                />
               </button>
-
             </div>
 
-            <div className="p-6 space-y-5">
+            <div className="p-5 sm:p-6 overflow-y-auto max-h-[calc(92vh-150px)] space-y-5">
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div className="bg-[#faf7f3] rounded-2xl p-4">
+                  <div className="text-[10px] uppercase tracking-[0.14em] font-bold text-[#9a9189]">
+                    Customer
+                  </div>
 
-              <div>
+                  <div className="font-bold text-sm mt-2">
+                    {selectedOrder.student_name ||
+                      "Customer"}
+                  </div>
 
-                <div className="text-xs text-gray-400 uppercase">
-                  Customer
+                  <div className="text-xs text-[#81786f] mt-1">
+                    {selectedOrder.delivery_phone ||
+                      selectedOrder.student_phone ||
+                      "No phone"}
+                  </div>
                 </div>
 
-                <div className="font-bold text-lg">
-                  {selectedOrder.student_name}
-                </div>
+                <div className="bg-[#faf7f3] rounded-2xl p-4">
+                  <div className="text-[10px] uppercase tracking-[0.14em] font-bold text-[#9a9189]">
+                    Fulfillment
+                  </div>
 
-                <div className="text-sm text-gray-500">
-                  {selectedOrder.delivery_phone ||
-                    selectedOrder.student_phone ||
-                    "No phone"}
-                </div>
+                  <div className="font-bold text-sm mt-2">
+                    {selectedOrder.fulfillment_type ===
+                    "delivery"
+                      ? "Delivery"
+                      : "Customer Pickup"}
+                  </div>
 
+                  {selectedOrder.fulfillment_type ===
+                    "delivery" && (
+                    <div className="text-xs text-[#81786f] mt-1">
+                      Building{" "}
+                      {selectedOrder.building_number ||
+                        "Not provided"}
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div>
-
-                <div className="text-xs text-gray-400 uppercase mb-2">
+                <div className="text-[10px] uppercase tracking-[0.14em] font-bold text-[#9a9189] mb-3">
                   Items
                 </div>
 
-                <div className="space-y-3">
-
-                  {(selectedOrder.items || []).map(
-                    (item) => (
-                      <div
-                        key={item.order_item_id}
-                        className="flex justify-between border-b pb-3"
-                      >
-
-                        <div>
-
-                          <div className="font-semibold">
-                            {item.menu_name}
-                          </div>
-
-                          <div className="text-sm text-gray-500">
-                            x{item.quantity}
-                          </div>
-
+                <div className="border border-[#eee8e1] rounded-2xl overflow-hidden divide-y divide-[#eee8e1]">
+                  {(selectedOrder.items ||
+                    []).map((item) => (
+                    <div
+                      key={
+                        item.order_item_id
+                      }
+                      className="px-4 py-3.5 flex items-center justify-between gap-4"
+                    >
+                      <div>
+                        <div className="font-bold text-sm">
+                          {item.menu_name}
                         </div>
 
-                        <div className="font-bold">
-                          ฿
-                          {Number(
-                            item.subtotal || 0
-                          ).toFixed(2)}
+                        <div className="text-xs text-[#81786f] mt-1">
+                          Quantity:{" "}
+                          {item.quantity}
                         </div>
-
                       </div>
-                    )
-                  )}
 
+                      <div className="font-bold text-sm">
+                        ฿
+                        {Number(
+                          item.subtotal ||
+                            0
+                        ).toFixed(2)}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-
               </div>
 
               {selectedOrder.fulfillment_type ===
                 "delivery" && (
-                <div className="bg-[#faf7f2] rounded-xl p-4">
-
-                  <div className="text-xs text-gray-400 uppercase mb-2">
-                    Delivery
+                <div className="bg-[#fff8f3] border border-[#f5e1d4] rounded-2xl p-4">
+                  <div className="text-[10px] uppercase tracking-[0.14em] font-bold text-[#9a9189] mb-2">
+                    Delivery Information
                   </div>
 
                   <div className="text-sm">
-                    <strong>Building:</strong>{" "}
+                    <span className="font-bold">
+                      Building:
+                    </span>{" "}
                     {selectedOrder.building_number ||
                       "Not provided"}
                   </div>
 
                   {selectedOrder.delivery_note && (
-                    <div className="text-sm mt-1">
-                      <strong>Note:</strong>{" "}
+                    <div className="text-sm mt-2">
+                      <span className="font-bold">
+                        Note:
+                      </span>{" "}
                       {selectedOrder.delivery_note}
                     </div>
                   )}
-
                 </div>
               )}
 
-              <div className="flex justify-between border-t pt-4">
+              <div className="pt-4 border-t border-[#eee8e1] flex items-end justify-between">
+                <div>
+                  <div className="text-[10px] uppercase tracking-[0.14em] font-bold text-[#9a9189]">
+                    Total
+                  </div>
 
-                <span className="font-semibold">
-                  Total
-                </span>
+                  <div className="text-xs text-[#81786f] mt-1">
+                    Order #{selectedOrder.order_id}
+                  </div>
+                </div>
 
-                <span className="text-xl font-bold">
+                <div className="text-2xl font-black">
                   ฿
                   {Number(
-                    selectedOrder.total_amount || 0
+                    selectedOrder.total_amount ||
+                      0
                   ).toFixed(2)}
-                </span>
-
+                </div>
               </div>
-
             </div>
 
-            <div className="px-6 py-4 border-t bg-[#faf8f5] flex justify-end">
+            <div className="px-5 sm:px-6 py-4 border-t border-[#eee8e1] bg-[#fcfaf8] flex flex-wrap justify-end gap-2">
+              {selectedOrder.order_status ===
+                "pending" && (
+                <button
+                  type="button"
+                  disabled={
+                    updatingOrderId ===
+                    selectedOrder.order_id
+                  }
+                  onClick={() =>
+                    updateOrderStatus(
+                      selectedOrder,
+                      "confirmed"
+                    )
+                  }
+                  className="h-10 px-4 rounded-xl bg-[#211f1c] text-white text-xs font-bold disabled:opacity-50"
+                >
+                  Confirm Order
+                </button>
+              )}
+
+              {selectedOrder.order_status ===
+                "confirmed" && (
+                <button
+                  type="button"
+                  disabled={
+                    updatingOrderId ===
+                    selectedOrder.order_id
+                  }
+                  onClick={() =>
+                    updateOrderStatus(
+                      selectedOrder,
+                      "preparing"
+                    )
+                  }
+                  className="h-10 px-4 rounded-xl bg-[#e84a25] text-white text-xs font-bold disabled:opacity-50"
+                >
+                  Start Preparing
+                </button>
+              )}
+
+              {selectedOrder.order_status ===
+                "preparing" && (
+                <button
+                  type="button"
+                  disabled={
+                    updatingOrderId ===
+                    selectedOrder.order_id
+                  }
+                  onClick={() =>
+                    updateOrderStatus(
+                      selectedOrder,
+                      "ready"
+                    )
+                  }
+                  className="h-10 px-4 rounded-xl bg-emerald-600 text-white text-xs font-bold disabled:opacity-50"
+                >
+                  Mark Ready
+                </button>
+              )}
 
               <button
                 type="button"
                 onClick={() =>
                   setSelectedOrder(null)
                 }
-                className="border border-[#ded5ca] bg-white rounded-lg px-5 py-2.5 text-sm font-semibold"
+                className="h-10 px-4 rounded-xl border border-[#ded5ca] bg-white text-xs font-bold"
               >
                 Close
               </button>
-
             </div>
-
           </div>
-
         </div>
-
       )}
 
-      {/* ==================================================
-          MENU MODAL
-      ================================================== */}
+      {/* =====================================================
+          ADD / EDIT MENU MODAL
+      ===================================================== */}
 
       {showMenuModal && (
-
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-
-          <div className="bg-white rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-
-            <div className="px-6 py-5 border-b flex justify-between">
-
+        <div
+          className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-[2px] flex items-center justify-center p-3 sm:p-5"
+          onMouseDown={(event) => {
+            if (
+              event.target ===
+              event.currentTarget
+            ) {
+              setShowMenuModal(false);
+            }
+          }}
+        >
+          <div className="bg-white rounded-[26px] w-full max-w-xl max-h-[92vh] overflow-hidden shadow-[0_30px_100px_rgba(0,0,0,0.22)]">
+            <div className="px-5 sm:px-6 py-5 border-b border-[#eee8e1] flex items-center justify-between">
               <div>
+                <div className="text-[10px] uppercase tracking-[0.16em] font-bold text-[#e84a25]">
+                  Menu
+                </div>
 
-                <h2 className="text-xl font-bold">
+                <h2 className="text-xl font-black mt-1">
                   {editingItem
-                    ? "Edit Menu"
-                    : "Add Menu"}
+                    ? "Edit Menu Item"
+                    : "Add Menu Item"}
                 </h2>
 
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-[#81786f] mt-1">
                   {editingItem
-                    ? "Update your food item."
-                    : "Add a new food item."}
+                    ? "Update the information for this food item."
+                    : "Add a new item to your food court menu."}
                 </p>
-
               </div>
 
               <button
@@ -1840,153 +2872,187 @@ export default function ShopOwnerPage() {
                 onClick={() =>
                   setShowMenuModal(false)
                 }
-                className="text-xl"
+                className="w-10 h-10 rounded-xl bg-[#f7f3ee] flex items-center justify-center text-[#665d55]"
               >
-                ×
+                <Icon
+                  name="close"
+                  size={18}
+                />
               </button>
-
             </div>
 
             <form
               onSubmit={saveMenu}
-              className="p-6 space-y-4"
+              className="p-5 sm:p-6 overflow-y-auto max-h-[calc(92vh-130px)]"
             >
-
-              <div>
-
-                <label className="block text-sm font-semibold mb-1.5">
-                  Food Name
-                </label>
-
-                <input
-                  type="text"
-                  value={menuForm.name}
-                  onChange={(event) =>
-                    setMenuForm({
-                      ...menuForm,
-                      name: event.target.value,
-                    })
-                  }
-                  className="w-full border border-[#ded5ca] rounded-lg px-3 py-2.5 text-sm"
-                  placeholder="Enter food name"
-                />
-
-              </div>
-
-              <div>
-
-                <label className="block text-sm font-semibold mb-1.5">
-                  Description
-                </label>
-
-                <textarea
-                  value={
-                    menuForm.description
-                  }
-                  onChange={(event) =>
-                    setMenuForm({
-                      ...menuForm,
-                      description:
-                        event.target.value,
-                    })
-                  }
-                  rows={3}
-                  className="w-full border border-[#ded5ca] rounded-lg px-3 py-2.5 text-sm"
-                />
-
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-
+              <div className="space-y-5">
                 <div>
-
-                  <label className="block text-sm font-semibold mb-1.5">
-                    Price
+                  <label className="block text-xs font-bold text-[#4d463f] mb-2">
+                    Food Name
                   </label>
 
                   <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={menuForm.price}
+                    type="text"
+                    value={menuForm.name}
                     onChange={(event) =>
                       setMenuForm({
                         ...menuForm,
-                        price:
-                          event.target.value,
+                        name: event.target.value,
                       })
                     }
-                    className="w-full border border-[#ded5ca] rounded-lg px-3 py-2.5 text-sm"
+                    placeholder="e.g. Chicken Teriyaki Rice"
+                    className="w-full h-11 px-3.5 rounded-xl border border-[#ded5ca] bg-white text-sm outline-none focus:border-[#e84a25] transition"
                   />
-
                 </div>
 
                 <div>
-
-                  <label className="block text-sm font-semibold mb-1.5">
-                    Category
+                  <label className="block text-xs font-bold text-[#4d463f] mb-2">
+                    Description
                   </label>
 
-                  <select
-                    value={menuForm.category}
+                  <textarea
+                    value={
+                      menuForm.description
+                    }
                     onChange={(event) =>
                       setMenuForm({
                         ...menuForm,
-                        category:
+                        description:
                           event.target.value,
                       })
                     }
-                    className="w-full border border-[#ded5ca] rounded-lg px-3 py-2.5 text-sm bg-white"
-                  >
-
-                    <option value="Rice">
-                      Rice
-                    </option>
-
-                    <option value="Noodles">
-                      Noodles
-                    </option>
-
-                    <option value="Other">
-                      Other
-                    </option>
-
-                  </select>
-
+                    rows={3}
+                    placeholder="Describe the food item..."
+                    className="w-full px-3.5 py-3 rounded-xl border border-[#ded5ca] bg-white text-sm outline-none focus:border-[#e84a25] transition resize-none"
+                  />
                 </div>
 
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-[#4d463f] mb-2">
+                      Price
+                    </label>
+
+                    <div className="relative">
+                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#81786f] text-sm">
+                        ฿
+                      </span>
+
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={
+                          menuForm.price
+                        }
+                        onChange={(event) =>
+                          setMenuForm({
+                            ...menuForm,
+                            price:
+                              event.target.value,
+                          })
+                        }
+                        placeholder="0.00"
+                        className="w-full h-11 pl-8 pr-3.5 rounded-xl border border-[#ded5ca] bg-white text-sm outline-none focus:border-[#e84a25] transition"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-[#4d463f] mb-2">
+                      Category
+                    </label>
+
+                    <select
+                      value={
+                        menuForm.category
+                      }
+                      onChange={(event) =>
+                        setMenuForm({
+                          ...menuForm,
+                          category:
+                            event.target.value,
+                        })
+                      }
+                      className="w-full h-11 px-3.5 rounded-xl border border-[#ded5ca] bg-white text-sm outline-none focus:border-[#e84a25] transition"
+                    >
+                      <option value="Rice">
+                        Rice
+                      </option>
+
+                      <option value="Noodles">
+                        Noodles
+                      </option>
+
+                      <option value="Other">
+                        Other
+                      </option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#4d463f] mb-2">
+                    Food Image
+                  </label>
+
+                  <label className="block cursor-pointer">
+                    <div className="border-2 border-dashed border-[#ded5ca] rounded-2xl overflow-hidden hover:border-[#e84a25] transition">
+                      {menuImagePreview ? (
+                        <div className="relative aspect-[16/8] bg-[#f7f3ee]">
+                          <img
+                            src={
+                              menuImagePreview
+                            }
+                            alt="Preview"
+                            className="w-full h-full object-cover"
+                          />
+
+                          <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 hover:opacity-100 transition">
+                            <span className="bg-white px-3 py-2 rounded-lg text-xs font-bold">
+                              Change image
+                            </span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="py-9 text-center">
+                          <div className="w-11 h-11 mx-auto rounded-xl bg-[#f7f3ee] flex items-center justify-center">
+                            <Icon
+                              name="plus"
+                              size={18}
+                            />
+                          </div>
+
+                          <div className="text-sm font-bold mt-3">
+                            Upload food image
+                          </div>
+
+                          <div className="text-xs text-[#81786f] mt-1">
+                            JPG, PNG or WEBP
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={
+                        handleMenuImageChange
+                      }
+                      className="hidden"
+                    />
+                  </label>
+                </div>
               </div>
 
-              <div>
-
-                <label className="block text-sm font-semibold mb-1.5">
-                  Food Image
-                </label>
-
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(event) =>
-                    setMenuForm({
-                      ...menuForm,
-                      image:
-                        event.target.files?.[0] ||
-                        null,
-                    })
-                  }
-                  className="w-full border border-[#ded5ca] rounded-lg px-3 py-2.5 text-sm"
-                />
-
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2">
-
+              <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 mt-7 pt-5 border-t border-[#eee8e1]">
                 <button
                   type="button"
                   onClick={() =>
                     setShowMenuModal(false)
                   }
-                  className="border border-[#ded5ca] rounded-lg px-4 py-2.5 text-sm"
+                  className="h-11 px-5 rounded-xl border border-[#ded5ca] text-xs font-bold hover:bg-[#f8f4ef] transition"
                 >
                   Cancel
                 </button>
@@ -1994,47 +3060,51 @@ export default function ShopOwnerPage() {
                 <button
                   type="submit"
                   disabled={savingMenu}
-                  className="bg-[#e84a25] text-white rounded-lg px-5 py-2.5 text-sm font-semibold disabled:opacity-50"
+                  className="h-11 px-5 rounded-xl bg-[#e84a25] text-white text-xs font-bold hover:bg-[#d83d1d] disabled:opacity-50 transition"
                 >
                   {savingMenu
                     ? "Saving..."
                     : editingItem
                     ? "Save Changes"
-                    : "Add Menu"}
+                    : "Add Menu Item"}
                 </button>
-
               </div>
-
             </form>
-
           </div>
-
         </div>
-
       )}
 
-      {/* ==================================================
+      {/* =====================================================
           ACCOUNT MODAL
-      ================================================== */}
+      ===================================================== */}
 
       {showAccountModal && (
-
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-
-          <div className="bg-white rounded-xl w-full max-w-md">
-
-            <div className="px-6 py-5 border-b flex justify-between">
-
+        <div
+          className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-[2px] flex items-center justify-center p-3 sm:p-5"
+          onMouseDown={(event) => {
+            if (
+              event.target ===
+              event.currentTarget
+            ) {
+              setShowAccountModal(false);
+            }
+          }}
+        >
+          <div className="bg-white rounded-[26px] w-full max-w-md max-h-[92vh] overflow-hidden shadow-[0_30px_100px_rgba(0,0,0,0.22)]">
+            <div className="px-5 sm:px-6 py-5 border-b border-[#eee8e1] flex items-center justify-between">
               <div>
+                <div className="text-[10px] uppercase tracking-[0.16em] font-bold text-[#e84a25]">
+                  Account
+                </div>
 
-                <h2 className="text-xl font-bold">
-                  Account Management
+                <h2 className="text-xl font-black mt-1">
+                  Shop Information
                 </h2>
 
-                <p className="text-xs text-gray-500 mt-1">
-                  Manage your shop information.
+                <p className="text-xs text-[#81786f] mt-1">
+                  Update the information shown
+                  on your shop profile.
                 </p>
-
               </div>
 
               <button
@@ -2042,150 +3112,246 @@ export default function ShopOwnerPage() {
                 onClick={() =>
                   setShowAccountModal(false)
                 }
-                className="text-xl"
+                className="w-10 h-10 rounded-xl bg-[#f7f3ee] flex items-center justify-center"
               >
-                ×
+                <Icon
+                  name="close"
+                  size={18}
+                />
               </button>
-
             </div>
 
             <form
               onSubmit={saveAccount}
-              className="p-6 space-y-4"
+              className="p-5 sm:p-6 overflow-y-auto max-h-[calc(92vh-130px)]"
             >
+              <div className="flex justify-center mb-6">
+                <label className="relative cursor-pointer group">
+                  <div className="w-24 h-24 rounded-[28px] bg-[#f5e9df] overflow-hidden flex items-center justify-center border-4 border-white shadow-[0_8px_25px_rgba(35,28,20,0.08)]">
+                    {accountPreview ||
+                    account?.shop_image ? (
+                      <img
+                        src={
+                          accountPreview ||
+                          account.shop_image
+                        }
+                        alt={
+                          account?.name ||
+                          "Shop"
+                        }
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <Icon
+                        name="user"
+                        size={30}
+                      />
+                    )}
+                  </div>
 
-              <div className="flex justify-center">
-
-                <div className="w-20 h-20 rounded-full bg-[#f5e9df] overflow-hidden flex items-center justify-center">
-
-                  {account?.shop_image ? (
-                    <img
-                      src={
-                        account.shop_image
-                      }
-                      alt={
-                        account?.name ||
-                        "Shop"
-                      }
-                      className="w-full h-full object-cover"
+                  <div className="absolute right-0 bottom-0 w-8 h-8 rounded-full bg-[#211f1c] text-white border-2 border-white flex items-center justify-center">
+                    <Icon
+                      name="edit"
+                      size={13}
                     />
-                  ) : (
-                    <span className="text-3xl">
-                      👨‍🍳
-                    </span>
-                  )}
+                  </div>
 
+                  <input
+                    type="file"
+                    name="image"
+                    accept="image/*"
+                    onChange={
+                      handleAccountChange
+                    }
+                    className="hidden"
+                  />
+                </label>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-[#4d463f] mb-2">
+                    Shop Name
+                  </label>
+
+                  <input
+                    type="text"
+                    name="name"
+                    value={
+                      accountForm.name
+                    }
+                    onChange={
+                      handleAccountChange
+                    }
+                    className="w-full h-11 px-3.5 rounded-xl border border-[#ded5ca] text-sm outline-none focus:border-[#e84a25] transition"
+                  />
                 </div>
 
+                <div>
+                  <label className="block text-xs font-bold text-[#4d463f] mb-2">
+                    Email
+                  </label>
+
+                  <input
+                    type="email"
+                    value={
+                      account?.email || ""
+                    }
+                    disabled
+                    className="w-full h-11 px-3.5 rounded-xl border border-[#ded5ca] bg-[#f5f2ee] text-[#8a8178] text-sm outline-none"
+                  />
+
+                  <div className="text-[10px] text-[#9a9189] mt-1.5">
+                    Email cannot be changed
+                    here.
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#4d463f] mb-2">
+                    Phone
+                  </label>
+
+                  <input
+                    type="text"
+                    name="phone"
+                    value={
+                      accountForm.phone
+                    }
+                    onChange={
+                      handleAccountChange
+                    }
+                    placeholder="Enter phone number"
+                    className="w-full h-11 px-3.5 rounded-xl border border-[#ded5ca] text-sm outline-none focus:border-[#e84a25] transition"
+                  />
+                </div>
               </div>
 
-              <div>
-
-                <label className="block text-sm font-semibold mb-1.5">
-                  Shop Name
-                </label>
-
-                <input
-                  type="text"
-                  name="name"
-                  value={
-                    accountForm.name
-                  }
-                  onChange={
-                    handleAccountChange
-                  }
-                  className="w-full border border-[#ded5ca] rounded-lg px-3 py-2.5 text-sm"
-                />
-
-              </div>
-
-              <div>
-
-                <label className="block text-sm font-semibold mb-1.5">
-                  Email
-                </label>
-
-                <input
-                  type="email"
-                  value={
-                    account?.email || ""
-                  }
-                  disabled
-                  className="w-full border border-[#ded5ca] rounded-lg px-3 py-2.5 text-sm bg-gray-100"
-                />
-
-              </div>
-
-              <div>
-
-                <label className="block text-sm font-semibold mb-1.5">
-                  Phone
-                </label>
-
-                <input
-                  type="text"
-                  name="phone"
-                  value={
-                    accountForm.phone
-                  }
-                  onChange={
-                    handleAccountChange
-                  }
-                  className="w-full border border-[#ded5ca] rounded-lg px-3 py-2.5 text-sm"
-                />
-
-              </div>
-
-              <div>
-
-                <label className="block text-sm font-semibold mb-1.5">
-                  Shop Image
-                </label>
-
-                <input
-                  type="file"
-                  name="image"
-                  accept="image/*"
-                  onChange={
-                    handleAccountChange
-                  }
-                  className="w-full border border-[#ded5ca] rounded-lg px-3 py-2.5 text-sm"
-                />
-
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2">
-
+              <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 mt-7 pt-5 border-t border-[#eee8e1]">
                 <button
                   type="button"
                   onClick={() =>
                     setShowAccountModal(false)
                   }
-                  className="border border-[#ded5ca] rounded-lg px-4 py-2.5 text-sm"
+                  className="h-11 px-5 rounded-xl border border-[#ded5ca] text-xs font-bold hover:bg-[#f8f4ef] transition"
                 >
                   Cancel
                 </button>
 
                 <button
                   type="submit"
-                  disabled={savingAccount}
-                  className="bg-[#e84a25] text-white rounded-lg px-5 py-2.5 text-sm font-semibold disabled:opacity-50"
+                  disabled={
+                    savingAccount
+                  }
+                  className="h-11 px-5 rounded-xl bg-[#e84a25] text-white text-xs font-bold hover:bg-[#d83d1d] disabled:opacity-50 transition"
                 >
                   {savingAccount
                     ? "Saving..."
                     : "Save Changes"}
                 </button>
-
               </div>
-
             </form>
-
           </div>
-
         </div>
-
       )}
-
     </main>
+  );
+}
+
+// =========================================================
+// SMALL COMPONENTS
+// =========================================================
+
+function MiniStat({
+  label,
+  value,
+}) {
+  return (
+    <div className="bg-white border border-[#ebe3da] rounded-2xl p-4">
+      <div className="text-[9px] uppercase tracking-[0.14em] font-bold text-[#9a9189]">
+        {label}
+      </div>
+
+      <div className="text-xl font-black mt-1">
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function PipelineStat({
+  label,
+  value,
+}) {
+  return (
+    <div className="bg-[#2b2926] rounded-2xl p-4">
+      <div className="text-[10px] text-[#a9a19a]">
+        {label}
+      </div>
+
+      <div className="text-2xl font-black mt-1">
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function OrderFilter({
+  label,
+  value,
+  active,
+  onClick,
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-2xl px-3 py-3 text-left border transition ${
+        active
+          ? "bg-[#211f1c] border-[#211f1c] text-white"
+          : "bg-white border-[#ebe3da] text-[#514941] hover:bg-[#faf7f3]"
+      }`}
+    >
+      <div
+        className={`text-[9px] uppercase tracking-[0.12em] font-bold ${
+          active
+            ? "text-[#aaa19a]"
+            : "text-[#9a9189]"
+        }`}
+      >
+        {label}
+      </div>
+
+      <div className="text-lg font-black mt-1">
+        {value}
+      </div>
+    </button>
+  );
+}
+
+function MenuSkeleton() {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+      {Array.from({
+        length: 6,
+      }).map((_, index) => (
+        <div
+          key={index}
+          className="bg-white border border-[#ebe3da] rounded-[22px] overflow-hidden animate-pulse"
+        >
+          <div className="aspect-[4/3] bg-[#eee8e1]" />
+
+          <div className="p-5">
+            <div className="h-5 bg-[#eee8e1] rounded w-2/3" />
+
+            <div className="h-3 bg-[#f1ece6] rounded w-full mt-3" />
+
+            <div className="h-3 bg-[#f1ece6] rounded w-4/5 mt-2" />
+
+            <div className="h-10 bg-[#f1ece6] rounded-xl mt-5" />
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
