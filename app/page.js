@@ -15,6 +15,9 @@ export default function HomePage() {
   const [checkingUser, setCheckingUser] = useState(true);
   const [accountOpen, setAccountOpen] = useState(false);
 
+  // CONTACT US
+  const [contactOpen, setContactOpen] = useState(false);
+
   // =========================================================
   // USER SESSION
   // =========================================================
@@ -66,6 +69,7 @@ export default function HomePage() {
       }
     } catch (error) {
       console.error("LOAD SHOPS ERROR:", error);
+
       setMessage(
         "Unable to connect to the shop system."
       );
@@ -184,7 +188,9 @@ export default function HomePage() {
 
         <div className="mx-auto flex min-h-[64px] max-w-[1240px] items-center gap-3 px-4 sm:px-6 lg:px-8">
 
-          {/* LOGO */}
+          {/* =================================================
+              LOGO
+          ================================================= */}
 
           <button
             type="button"
@@ -194,17 +200,25 @@ export default function HomePage() {
             UniPlate
           </button>
 
-          {/* FOOD COURT */}
+          {/* =================================================
+              FOOD COURT
+          ================================================= */}
 
           <div className="hidden items-center gap-2 rounded-full border border-[#ded5ca] bg-white px-4 py-2 text-[12px] font-semibold lg:flex">
-            <span className="text-sm">📍</span>
+
+            <span className="text-sm">
+              📍
+            </span>
 
             <span>
               University Food Court
             </span>
+
           </div>
 
-          {/* DESKTOP SEARCH */}
+          {/* =================================================
+              DESKTOP SEARCH
+          ================================================= */}
 
           <div className="mx-auto hidden w-full max-w-[430px] md:block">
 
@@ -221,7 +235,12 @@ export default function HomePage() {
                 strokeLinecap="round"
                 strokeLinejoin="round"
               >
-                <circle cx="11" cy="11" r="7" />
+                <circle
+                  cx="11"
+                  cy="11"
+                  r="7"
+                />
+
                 <path d="m20 20-4-4" />
               </svg>
 
@@ -255,11 +274,15 @@ export default function HomePage() {
 
           </div>
 
-          {/* RIGHT SIDE */}
+          {/* =================================================
+              RIGHT SIDE
+          ================================================= */}
 
           <div className="ml-auto flex items-center gap-2">
 
-            {/* MY ORDERS */}
+            {/* =================================================
+                MY ORDERS
+            ================================================= */}
 
             {!checkingUser && isStudent && (
               <button
@@ -285,7 +308,9 @@ export default function HomePage() {
               </button>
             )}
 
-            {/* LOGIN */}
+            {/* =================================================
+                LOGIN
+            ================================================= */}
 
             {!checkingUser && !isStudent && (
               <button
@@ -311,7 +336,9 @@ export default function HomePage() {
               </button>
             )}
 
-            {/* ACCOUNT */}
+            {/* =================================================
+                ACCOUNT
+            ================================================= */}
 
             {!checkingUser && isStudent && (
               <div className="relative">
@@ -339,16 +366,19 @@ export default function HomePage() {
                 >
 
                   <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#171717] text-[11px] font-bold text-white">
+
                     {user?.name
                       ? user.name
                           .charAt(0)
                           .toUpperCase()
                       : "S"}
+
                   </div>
 
                   <span className="hidden max-w-[90px] truncate text-[12px] font-bold sm:block">
-                    {user?.name ||
-                      "Student"}
+
+                    {user?.name || "Student"}
+
                   </span>
 
                   <svg
@@ -369,26 +399,41 @@ export default function HomePage() {
 
                 </button>
 
+                {/* ACCOUNT DROPDOWN */}
+
                 {accountOpen && (
-                  <div className="absolute right-0 top-11 z-50 w-[260px] overflow-hidden rounded-2xl border border-[#e2dacf] bg-white shadow-[0_15px_40px_rgba(0,0,0,0.12)]">
+                  <div className="
+                    absolute
+                    right-0
+                    top-11
+                    z-50
+                    w-[260px]
+                    overflow-hidden
+                    rounded-2xl
+                    border
+                    border-[#e2dacf]
+                    bg-white
+                    shadow-[0_15px_40px_rgba(0,0,0,0.12)]
+                  ">
 
                     <div className="border-b border-[#eee8df] bg-[#faf7f2] px-4 py-3">
 
                       <div className="flex items-center gap-3">
 
                         <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#171717] text-xs font-bold text-white">
+
                           {user?.name
                             ? user.name
                                 .charAt(0)
                                 .toUpperCase()
                             : "S"}
+
                         </div>
 
                         <div className="min-w-0">
 
                           <p className="truncate text-sm font-bold">
-                            {user?.name ||
-                              "Student"}
+                            {user?.name || "Student"}
                           </p>
 
                           <p className="truncate text-[11px] text-[#858078]">
@@ -406,7 +451,9 @@ export default function HomePage() {
                       onClick={openAccount}
                       className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-[#faf7f2]"
                     >
-                      <span>👤</span>
+                      <span>
+                        👤
+                      </span>
 
                       <span className="text-sm font-semibold">
                         My Account
@@ -418,7 +465,9 @@ export default function HomePage() {
                       onClick={openAccount}
                       className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-[#faf7f2]"
                     >
-                      <span>⚙️</span>
+                      <span>
+                        ⚙️
+                      </span>
 
                       <span className="text-sm font-semibold">
                         Manage Account
@@ -432,7 +481,9 @@ export default function HomePage() {
                       onClick={handleLogout}
                       className="flex w-full items-center gap-3 px-4 py-3 text-left text-red-600 hover:bg-red-50"
                     >
-                      <span>🚪</span>
+                      <span>
+                        🚪
+                      </span>
 
                       <span className="text-sm font-semibold">
                         Logout
@@ -445,7 +496,9 @@ export default function HomePage() {
               </div>
             )}
 
-            {/* CART */}
+            {/* =================================================
+                CART
+            ================================================= */}
 
             {!checkingUser && isStudent && (
               <button
@@ -478,6 +531,7 @@ export default function HomePage() {
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 >
+
                   <circle
                     cx="9"
                     cy="20"
@@ -491,6 +545,7 @@ export default function HomePage() {
                   />
 
                   <path d="M3 4h2l2.4 11.2a2 2 0 0 0 2 1.6h8.8a2 2 0 0 0 2-1.6L22 8H6" />
+
                 </svg>
 
                 <span className="hidden sm:inline">
@@ -529,8 +584,15 @@ export default function HomePage() {
             strokeLinecap="round"
             strokeLinejoin="round"
           >
-            <circle cx="11" cy="11" r="7" />
+
+            <circle
+              cx="11"
+              cy="11"
+              r="7"
+            />
+
             <path d="m20 20-4-4" />
+
           </svg>
 
           <input
@@ -584,6 +646,8 @@ export default function HomePage() {
           lg:py-12
         ">
 
+          {/* HERO LEFT */}
+
           <div className="min-w-0">
 
             <div className="mb-2 flex items-center gap-2">
@@ -612,9 +676,11 @@ export default function HomePage() {
             >
               What are you craving
               <br className="hidden sm:block" />
+
               <span className="sm:hidden">
                 {" "}
               </span>
+
               today?
             </h1>
 
@@ -625,35 +691,287 @@ export default function HomePage() {
 
           </div>
 
-          {/* DESKTOP INFO */}
+          {/* =================================================
+              CONTACT US
+              NORMAL PAGE POSITION
+              NOT STICKY
+          ================================================= */}
 
           <div className="
             w-full
             shrink-0
-            rounded-2xl
-            border
-            border-[#e1d9cf]
-            bg-white
-            px-5
-            py-4
             sm:max-w-[280px]
-            lg:w-[220px]
+            lg:w-[280px]
             lg:max-w-none
           ">
 
-            <p className="text-[10px] uppercase tracking-wider text-[#9a938b]">
-              Food Court
-            </p>
+            <div
+              className="
+                overflow-hidden
+                rounded-2xl
+                border
+                border-[#e1d9cf]
+                bg-white
+                shadow-[0_12px_30px_rgba(23,23,23,0.06)]
+              "
+            >
 
-            <p className="mt-1 text-sm font-bold">
-              University Campus
-            </p>
+              {/* CONTACT HEADER / BUTTON */}
 
-            <div className="mt-2 flex items-center gap-1.5 text-[11px] text-[#6b8060]">
+              <button
+                type="button"
+                onClick={() =>
+                  setContactOpen(
+                    (prev) => !prev
+                  )
+                }
+                className="
+                  flex
+                  w-full
+                  items-center
+                  justify-between
+                  bg-[#faf7f2]
+                  px-5
+                  py-4
+                  text-left
+                  transition
+                  hover:bg-[#f3eee7]
+                "
+              >
 
-              <span className="h-1.5 w-1.5 rounded-full bg-[#18c96b]" />
+                <div className="flex items-center gap-3">
 
-              Shops available now
+                  <div
+                    className="
+                      flex
+                      h-9
+                      w-9
+                      shrink-0
+                      items-center
+                      justify-center
+                      rounded-xl
+                      bg-[#171717]
+                      text-white
+                    "
+                  >
+
+                    <svg
+                      width="17"
+                      height="17"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4v8Z" />
+                    </svg>
+
+                  </div>
+
+                  <div>
+
+                    <p className="text-sm font-bold">
+                      Contact Us
+                    </p>
+
+                    <p className="mt-0.5 text-[10px] text-[#858078]">
+                      {contactOpen
+                        ? "Contact information"
+                        : "We&apos;re happy to help you"}
+                    </p>
+
+                  </div>
+
+                </div>
+
+                {/* ARROW */}
+
+                <svg
+                  width="15"
+                  height="15"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className={
+                    contactOpen
+                      ? "rotate-180 transition-transform"
+                      : "transition-transform"
+                  }
+                >
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+
+              </button>
+
+              {/* =================================================
+                  CONTACT DETAILS
+              ================================================= */}
+
+              {contactOpen && (
+                <div className="border-t border-[#eee8df] px-5 py-4">
+
+                  {/* PHONE */}
+
+                  <div className="flex items-center gap-3">
+
+                    <div
+                      className="
+                        flex
+                        h-8
+                        w-8
+                        shrink-0
+                        items-center
+                        justify-center
+                        rounded-lg
+                        bg-[#f7f0e8]
+                        text-[#8b7156]
+                      "
+                    >
+
+                      <svg
+                        width="15"
+                        height="15"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+
+                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.9.33 1.78.62 2.63a2 2 0 0 1-.45 2.11L8 9.73a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.85.29 1.73.5 2.63.62A2 2 0 0 1 22 16.92Z" />
+
+                      </svg>
+
+                    </div>
+
+                    <div>
+
+                      <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-[#9a938b]">
+                        Phone
+                      </p>
+
+                      <p className="mt-0.5 text-[13px] font-semibold text-[#171717]">
+                        0950264406
+                      </p>
+
+                    </div>
+
+                  </div>
+
+                  {/* EMAIL */}
+
+                  <div className="mt-4 flex items-center gap-3">
+
+                    <div
+                      className="
+                        flex
+                        h-8
+                        w-8
+                        shrink-0
+                        items-center
+                        justify-center
+                        rounded-lg
+                        bg-[#f7f0e8]
+                        text-[#8b7156]
+                      "
+                    >
+
+                      <svg
+                        width="15"
+                        height="15"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+
+                        <rect
+                          x="3"
+                          y="5"
+                          width="18"
+                          height="14"
+                          rx="2"
+                        />
+
+                        <path d="m3 7 9 6 9-6" />
+
+                      </svg>
+
+                    </div>
+
+                    <div>
+
+                      <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-[#9a938b]">
+                        Email
+                      </p>
+
+                      <p className="mt-0.5 text-[13px] font-semibold text-[#171717]">
+                        uniplate@rsu.edu
+                      </p>
+
+                    </div>
+
+                  </div>
+
+                  {/* LINE */}
+
+                  <div className="mt-4 flex items-center gap-3">
+
+                    <div
+                      className="
+                        flex
+                        h-8
+                        w-8
+                        shrink-0
+                        items-center
+                        justify-center
+                        rounded-lg
+                        bg-[#f7f0e8]
+                        text-[#8b7156]
+                      "
+                    >
+
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+
+                        <path d="M20.5 11.5c0 4.7-4.7 8.5-10.5 8.5-1 0-2-.1-2.9-.4L3 21l1.2-3.2C2.8 16.3 2 14.1 2 11.5 2 6.8 6.7 3 12.5 3s8 3.8 8 8.5Z" />
+
+                      </svg>
+
+                    </div>
+
+                    <div>
+
+                      <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-[#9a938b]">
+                        LINE
+                      </p>
+
+                      <p className="mt-0.5 text-[13px] font-semibold text-[#171717]">
+                        @waiyan166088
+                      </p>
+
+                    </div>
+
+                  </div>
+
+                </div>
+              )}
 
             </div>
 
@@ -751,9 +1069,11 @@ export default function HomePage() {
                 </h3>
 
                 <p className="mt-1 text-sm text-[#858078]">
+
                   {search
                     ? `No shops found for "${search}".`
                     : "There are currently no approved food shops."}
+
                 </p>
 
                 {search && (
@@ -771,15 +1091,6 @@ export default function HomePage() {
             </div>
 
           ) : (
-
-            /*
-             * DESKTOP
-             * 3 columns on large screens
-             * 2 columns on medium screens
-             *
-             * MOBILE
-             * horizontal carousel
-             */
 
             <div className="
               flex
@@ -817,7 +1128,6 @@ export default function HomePage() {
                     duration-200
                     hover:-translate-y-1
                     hover:shadow-[0_15px_35px_rgba(23,23,23,0.08)]
-
                     sm:min-w-0
                   "
                 >
@@ -957,6 +1267,7 @@ export default function HomePage() {
                           strokeLinecap="round"
                           strokeLinejoin="round"
                         >
+
                           <path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z" />
 
                           <circle
@@ -964,6 +1275,7 @@ export default function HomePage() {
                             cy="10"
                             r="2.5"
                           />
+
                         </svg>
 
                       </div>
@@ -1024,8 +1336,11 @@ export default function HomePage() {
                           strokeLinecap="round"
                           strokeLinejoin="round"
                         >
+
                           <path d="M5 12h14" />
+
                           <path d="m13 6 6 6-6 6" />
+
                         </svg>
 
                       </button>
