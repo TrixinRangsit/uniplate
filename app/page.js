@@ -779,7 +779,7 @@ export default function HomePage() {
                     <p className="mt-0.5 text-[10px] text-[#858078]">
                       {contactOpen
                         ? "Contact information"
-                        : "We&apos;re happy to help you"}
+                        : "Click to view"}
                     </p>
 
                   </div>
