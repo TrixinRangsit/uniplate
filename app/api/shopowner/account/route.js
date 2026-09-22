@@ -1,7 +1,90 @@
 import db from "@/lib/db";
 import { getSession } from "@/lib/auth";
-import fs from "fs/promises";
-import path from "path";
+import crypto from "crypto";
+
+/*
+|--------------------------------------------------------------------------
+| Cloudinary Upload
+|--------------------------------------------------------------------------
+*/
+
+async function uploadToCloudinary(file, userId) {
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+  const apiKey = process.env.CLOUDINARY_API_KEY;
+  const apiSecret = process.env.CLOUDINARY_API_SECRET;
+
+  if (!cloudName || !apiKey || !apiSecret) {
+    throw new Error(
+      "Cloudinary environment variables are not configured."
+    );
+  }
+
+  const timestamp = Math.floor(Date.now() / 1000);
+
+  const folder = "uniplate/shopowners";
+
+  /*
+   * Cloudinary signed upload signature
+   */
+  const signatureString =
+    `folder=${folder}&timestamp=${timestamp}${apiSecret}`;
+
+  const signature = crypto
+    .createHash("sha1")
+    .update(signatureString)
+    .digest("hex");
+
+  /*
+   * Convert File → Buffer
+   */
+  const bytes = await file.arrayBuffer();
+  const buffer = Buffer.from(bytes);
+
+  /*
+   * Cloudinary multipart upload
+   */
+  const formData = new FormData();
+
+  formData.append(
+    "file",
+    new Blob([buffer], {
+      type: file.type,
+    }),
+    file.name || "shop-owner-image"
+  );
+
+  formData.append("api_key", apiKey);
+  formData.append("timestamp", String(timestamp));
+  formData.append("folder", folder);
+  formData.append("signature", signature);
+
+  const response = await fetch(
+    `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
+    {
+      method: "POST",
+      body: formData,
+    }
+  );
+
+  const data = await response.json();
+
+  if (!response.ok || !data.secure_url) {
+    console.error("CLOUDINARY ERROR:", data);
+
+    throw new Error(
+      data?.error?.message ||
+        "Unable to upload image to Cloudinary."
+    );
+  }
+
+  return data.secure_url;
+}
+
+/*
+|--------------------------------------------------------------------------
+| GET SHOP OWNER ACCOUNT
+|--------------------------------------------------------------------------
+*/
 
 export async function GET() {
   try {
@@ -21,16 +104,16 @@ export async function GET() {
 
     const [users] = await db.query(
       `
-      SELECT
-        user_id,
-        name,
-        email,
-        phone,
-        role,
-        approval_status,
-        shop_image
-      FROM users
-      WHERE user_id = ?
+        SELECT
+          user_id,
+          name,
+          email,
+          phone,
+          role,
+          approval_status,
+          shop_image
+        FROM users
+        WHERE user_id = ?
       `,
       [session.user_id]
     );
@@ -55,12 +138,20 @@ export async function GET() {
     return Response.json(
       {
         success: false,
-        message: error.message || "Failed to load account.",
+        message:
+          error.message ||
+          "Failed to load account.",
       },
       { status: 500 }
     );
   }
 }
+
+/*
+|--------------------------------------------------------------------------
+| UPDATE SHOP OWNER ACCOUNT
+|--------------------------------------------------------------------------
+*/
 
 export async function PUT(request) {
   try {
@@ -83,16 +174,16 @@ export async function PUT(request) {
      */
     const [users] = await db.query(
       `
-      SELECT
-        user_id,
-        name,
-        email,
-        phone,
-        role,
-        approval_status,
-        shop_image
-      FROM users
-      WHERE user_id = ?
+        SELECT
+          user_id,
+          name,
+          email,
+          phone,
+          role,
+          approval_status,
+          shop_image
+        FROM users
+        WHERE user_id = ?
       `,
       [session.user_id]
     );
@@ -129,11 +220,16 @@ export async function PUT(request) {
     const formData = await request.formData();
 
     const name = formData.get("name");
+    const phone = formData.get("phone");
     const image = formData.get("image");
 
     console.log("ACCOUNT NAME:", name);
+    console.log("ACCOUNT PHONE:", phone);
     console.log("ACCOUNT IMAGE:", image);
 
+    /*
+     * Validate shop name
+     */
     if (
       !name ||
       typeof name !== "string" ||
@@ -156,9 +252,9 @@ export async function PUT(request) {
     let shopImage = currentUser.shop_image || null;
 
     /*
-     * ==========================
-     * SAVE NEW IMAGE
-     * ==========================
+     * ========================================================
+     * UPLOAD NEW PROFILE / SHOP IMAGE TO CLOUDINARY
+     * ========================================================
      */
 
     if (
@@ -166,10 +262,13 @@ export async function PUT(request) {
       typeof image !== "string" &&
       image.size > 0
     ) {
-      console.log("Uploading image...");
+      console.log("Uploading shop image to Cloudinary...");
       console.log("Image type:", image.type);
       console.log("Image size:", image.size);
 
+      /*
+       * Allowed image types
+       */
       const allowedTypes = [
         "image/jpeg",
         "image/png",
@@ -187,6 +286,9 @@ export async function PUT(request) {
         );
       }
 
+      /*
+       * Maximum 5 MB
+       */
       if (image.size > 5 * 1024 * 1024) {
         return Response.json(
           {
@@ -199,67 +301,27 @@ export async function PUT(request) {
       }
 
       /*
-       * Create public/uploads
+       * Upload directly to Cloudinary.
+       *
+       * IMPORTANT:
+       * We DO NOT write anything to public/uploads.
+       * This works on Vercel.
        */
-      const uploadDirectory = path.join(
-        process.cwd(),
-        "public",
-        "uploads"
+      shopImage = await uploadToCloudinary(
+        image,
+        currentUser.user_id
       );
 
-      await fs.mkdir(uploadDirectory, {
-        recursive: true,
-      });
-
-      /*
-       * File extension
-       */
-      let extension = ".jpg";
-
-      if (image.type === "image/png") {
-        extension = ".png";
-      }
-
-      if (image.type === "image/webp") {
-        extension = ".webp";
-      }
-
-      /*
-       * Create unique filename
-       */
-      const fileName =
-        `shop-${currentUser.user_id}-${Date.now()}${extension}`;
-
-      const filePath = path.join(
-        uploadDirectory,
-        fileName
+      console.log(
+        "CLOUDINARY IMAGE URL:",
+        shopImage
       );
-
-      /*
-       * Convert image to Buffer
-       */
-      const bytes = await image.arrayBuffer();
-
-      const buffer = Buffer.from(bytes);
-
-      /*
-       * Save image to public/uploads
-       */
-      await fs.writeFile(filePath, buffer);
-
-      /*
-       * Path saved into MySQL
-       */
-      shopImage = `/uploads/${fileName}`;
-
-      console.log("IMAGE SAVED:", filePath);
-      console.log("DATABASE IMAGE PATH:", shopImage);
     }
 
     /*
-     * ==========================
+     * ========================================================
      * UPDATE MYSQL
-     * ==========================
+     * ========================================================
      */
 
     console.log("UPDATING MYSQL...");
@@ -269,14 +331,16 @@ export async function PUT(request) {
 
     const [updateResult] = await db.query(
       `
-      UPDATE users
-      SET
-        name = ?,
-        shop_image = ?
-      WHERE user_id = ?
+        UPDATE users
+        SET
+          name = ?,
+          phone = ?,
+          shop_image = ?
+        WHERE user_id = ?
       `,
       [
         shopName,
+        phone || currentUser.phone || null,
         shopImage,
         currentUser.user_id,
       ]
@@ -288,20 +352,23 @@ export async function PUT(request) {
     );
 
     /*
-     * Verify database
+     * ========================================================
+     * VERIFY DATABASE
+     * ========================================================
      */
+
     const [updatedUsers] = await db.query(
       `
-      SELECT
-        user_id,
-        name,
-        email,
-        phone,
-        role,
-        approval_status,
-        shop_image
-      FROM users
-      WHERE user_id = ?
+        SELECT
+          user_id,
+          name,
+          email,
+          phone,
+          role,
+          approval_status,
+          shop_image
+        FROM users
+        WHERE user_id = ?
       `,
       [currentUser.user_id]
     );
@@ -311,6 +378,9 @@ export async function PUT(request) {
       updatedUsers[0]
     );
 
+    /*
+     * Return updated user
+     */
     return Response.json({
       success: true,
       message: "Shop account saved successfully.",
